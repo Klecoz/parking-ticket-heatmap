@@ -5,6 +5,7 @@ import { mountLeaderboard } from './leaderboard.js';
 import { mountLookup, selectStreet } from './lookup.js';
 import { highlightStreet, mountMap } from './map.js';
 import { mountRange } from './range.js';
+import { mountTopRangeSlider } from './rangeSlider.js';
 import { subscribe } from './state.js';
 import { mountTimeView } from './time.js';
 import { getTotalCount, initTimeIndex } from './timeIndex.js';
@@ -50,6 +51,7 @@ import { fmt } from './util.js';
 
   mountChips({ catalog });
   mountRange({ months: meta.months || [] });
+  mountTopRangeSlider({ months: meta.months || [] });
   mountMap({ streetsFc, onStreetSelected });
   mountTimeView({ time, catalog, months: meta.months || [] });
   mountLookup({ streets, catalog, months: meta.months || [], onStreetSelected });

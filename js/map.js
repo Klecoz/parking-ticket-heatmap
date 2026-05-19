@@ -13,12 +13,20 @@ let map, layer, onPickStreet = null;
 export function mountMap({ streetsFc, onStreetSelected }) {
   onPickStreet = onStreetSelected;
 
-  map = L.map('map', { preferCanvas: true, zoomControl: true }).setView(BUFFALO_CENTER, DEFAULT_ZOOM);
+  map = L.map('map', {
+    preferCanvas: true,
+    zoomControl: true,
+    scrollWheelZoom: false,  // replaced by custom handler below
+    zoomSnap: 0,             // allow fractional zoom for smooth feel
+    zoomDelta: 0.5,
+  }).setView(BUFFALO_CENTER, DEFAULT_ZOOM);
   L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
     subdomains: 'abcd',
     maxZoom: 19,
   }).addTo(map);
+
+  installSmoothWheelZoom(map);
 
   layer = L.geoJSON(streetsFc, {
     style: (f) => styleFor(f),
@@ -82,6 +90,30 @@ export function highlightStreet(normName) {
     const b = group.getBounds();
     if (b.isValid()) map.fitBounds(b.pad(0.5), { maxZoom: 16, animate: true });
   } catch (_) { /* ignore */ }
+}
+
+// Custom wheel handler:
+//   * Smooth (fractional) zoom — Leaflet's zoomSnap:0 + setZoomAround per event.
+//   * Trackpad direction is flipped (scroll down = zoom in) to match macOS Maps;
+//     coarse mouse wheel keeps the conventional direction.
+//   * Trackpad detection: small deltaY at deltaMode 0 = pixel-precision = trackpad.
+function installSmoothWheelZoom(mapInstance) {
+  const mapDiv = mapInstance.getContainer();
+  mapDiv.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const isTrackpad = Math.abs(e.deltaY) < 40 && e.deltaMode === 0;
+    // Sign convention: positive dZoom = zoom in.
+    //   Mouse wheel default (Leaflet): scroll up (negative deltaY) → zoom in. dir = -1.
+    //   Trackpad (user request):       scroll up (negative deltaY) → zoom out. dir = +1.
+    const dir = isTrackpad ? +1 : -1;
+    const factor = isTrackpad ? 0.008 : (0.5 / 120);
+    const dZoom = dir * e.deltaY * factor;
+    if (!dZoom) return;
+    const z = mapInstance.getZoom();
+    const newZ = Math.max(mapInstance.getMinZoom(), Math.min(mapInstance.getMaxZoom(), z + dZoom));
+    const pt = mapInstance.mouseEventToContainerPoint(e);
+    mapInstance.setZoomAround(mapInstance.containerPointToLatLng(pt), newZ, { animate: false });
+  }, { passive: false });
 }
 
 function escapeHtml(s) {

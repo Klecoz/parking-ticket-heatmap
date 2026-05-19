@@ -438,6 +438,136 @@ h3 {
 .brush-body:active { cursor: grabbing; }
 .sparkline { cursor: crosshair; }
 
+/* ============================ TOP RANGE SLIDER ============================ */
+
+.range-slider {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.65rem 0.85rem;
+  margin-bottom: 0.75rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.range-slider-track-wrap {
+  position: relative;
+  height: 32px;
+  touch-action: none;
+  user-select: none;
+}
+.range-slider-axis {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.66rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  margin-top: 2px;
+  padding: 0 2px;
+  letter-spacing: 0.04em;
+}
+.range-slider-track {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: 13px;
+  height: 6px;
+  background: var(--surface);
+  border-radius: 999px;
+  border: 1px solid var(--border);
+}
+.range-slider-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  background: var(--accent);
+  border-radius: inherit;
+}
+.range-slider-thumb {
+  position: absolute;
+  top: 6px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 2px solid var(--accent);
+  transform: translateX(-50%);
+  cursor: grab;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+  transition: transform 0.08s, box-shadow 0.08s;
+  z-index: 2;
+}
+.range-slider-thumb:hover,
+.range-slider-thumb:focus-visible {
+  box-shadow: 0 2px 6px rgba(0,0,0,0.22);
+  outline: none;
+}
+.range-slider-thumb:focus-visible {
+  border-color: var(--accent-deep);
+  box-shadow: 0 0 0 3px var(--accent-light);
+}
+.range-slider-thumb:active { cursor: grabbing; transform: translateX(-50%) scale(1.08); }
+.range-slider-thumb.collapsed {
+  background: var(--accent);
+  border-radius: 4px;
+  width: 14px;
+  height: 22px;
+  top: 5px;
+  transform: translateX(-50%) rotate(45deg);
+}
+.range-slider-thumb.collapsed:active {
+  transform: translateX(-50%) rotate(45deg) scale(1.08);
+}
+.range-slider-thumb.hidden { display: none; }
+.range-slider-readout {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.15rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text);
+  min-width: 120px;
+  text-align: right;
+}
+.range-slider-readout .readout-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.range-slider-reset {
+  margin-top: 2px;
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 500;
+  background: none;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  padding: 0.15rem 0.55rem;
+  color: var(--muted);
+  cursor: pointer;
+  align-self: flex-end;
+}
+.range-slider-reset:hover { background: var(--surface); color: var(--text); border-color: var(--text-soft); }
+.range-slider-reset[hidden] { display: none; }
+@media (max-width: 480px) {
+  .range-slider {
+    grid-template-columns: 1fr;
+    gap: 0.35rem;
+  }
+  .range-slider-readout {
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: space-between;
+    min-width: 0;
+  }
+  .range-slider-readout .readout-label { font-size: 0.6rem; }
+}
+
 /* ============================ MAP ============================ */
 
 #map-section { padding-top: 0.5rem; padding-bottom: 1.5rem; }

@@ -67,6 +67,25 @@
       <ul class="chip-bar" id="chipBar" role="listbox" aria-label="Violation filter"></ul>
     </div>
 
+    <div class="range-slider" id="topRangeSlider" role="group" aria-label="Date range">
+      <div class="range-slider-track-wrap" id="topRangeTrackWrap">
+        <div class="range-slider-track">
+          <div class="range-slider-fill" id="topRangeFill"></div>
+        </div>
+        <button type="button" class="range-slider-thumb" id="topRangeThumbFrom"
+                role="slider" aria-label="Range start month" tabindex="0"
+                aria-valuemin="0" aria-valuemax="0" aria-valuenow="0"></button>
+        <button type="button" class="range-slider-thumb" id="topRangeThumbTo"
+                role="slider" aria-label="Range end month" tabindex="0"
+                aria-valuemin="0" aria-valuemax="0" aria-valuenow="0"></button>
+      </div>
+      <div class="range-slider-readout">
+        <span class="readout-label">Date range</span>
+        <span id="topRangeReadout">All months</span>
+        <button type="button" class="range-slider-reset" id="topRangeReset" hidden>Reset</button>
+      </div>
+    </div>
+
     <div class="map-frame">
       <div id="map" role="region" aria-label="Heatmap of Buffalo parking summonses by street"></div>
       <div class="map-legend" aria-hidden="true">
