@@ -1,14 +1,14 @@
 // Renders Buffalo street centerlines as a Leaflet GeoJSON layer.
-// Per-feature stroke color reflects the active violation filter.
+// Per-feature stroke color reflects the active violation filter + date range.
 
-import { getFilter, subscribe } from './state.js';
+import { getState, subscribe } from './state.js';
+import { getMaxCount, getStreetCount } from './timeIndex.js';
 import { fmt, rampColor, rampValue } from './util.js';
 
 const BUFFALO_CENTER = [42.886, -78.878];
 const DEFAULT_ZOOM   = 12;
 
-let map, layer, allFeatures = [], onPickStreet = null;
-let maxForFilter = new Map(); // filter key -> max street count
+let map, layer, onPickStreet = null;
 
 export function mountMap({ streetsFc, onStreetSelected }) {
   onPickStreet = onStreetSelected;
@@ -19,9 +19,6 @@ export function mountMap({ streetsFc, onStreetSelected }) {
     subdomains: 'abcd',
     maxZoom: 19,
   }).addTo(map);
-
-  allFeatures = streetsFc.features || [];
-  precomputeMaxes(allFeatures);
 
   layer = L.geoJSON(streetsFc, {
     style: (f) => styleFor(f),
@@ -37,29 +34,11 @@ export function mountMap({ streetsFc, onStreetSelected }) {
   } catch (_) { /* fall through */ }
 }
 
-function precomputeMaxes(features) {
-  // Compute max per filter key, including '_all'.
-  const accAll = new Map();
-  for (const f of features) {
-    const c = f.properties?.count || 0;
-    if (c > (accAll.get('_all') || 0)) accAll.set('_all', c);
-    const bv = f.properties?.byViolation || {};
-    for (const k in bv) {
-      if (bv[k] > (accAll.get(k) || 0)) accAll.set(k, bv[k]);
-    }
-  }
-  maxForFilter = accAll;
-}
-
-function valueFor(props, filter) {
-  if (filter === '_all') return props.count || 0;
-  return (props.byViolation && props.byViolation[filter]) || 0;
-}
-
 function styleFor(feature) {
-  const f = getFilter();
-  const v = valueFor(feature.properties || {}, f);
-  const max = maxForFilter.get(f) || 1;
+  const state = getState();
+  const norm = feature.properties?.name;
+  const v = getStreetCount(norm, state);
+  const max = getMaxCount(state);
   const t = rampValue(v, max);
   const isHot = v > 0;
   return {
@@ -79,10 +58,11 @@ function bindFeature(feature, layerObj) {
   layerObj.on('mouseout', () => layerObj.setStyle(styleFor(feature)));
   layerObj.on('click', () => {
     const props = feature.properties || {};
-    const f = getFilter();
-    const v = valueFor(props, f);
+    const state = getState();
+    const norm = props.name;
+    const v = getStreetCount(norm, state);
     const html = `<strong>${escapeHtml(props.display || props.name)}</strong>`
-      + `${fmt(v)} ${f === '_all' ? 'tickets' : 'tickets (filtered)'} since 2024`
+      + `${fmt(v)} ${state.filter === '_all' ? 'tickets' : 'tickets (filtered)'} since 2024`
       + (props.rank ? `<br>citywide rank #${fmt(props.rank)}` : '');
     layerObj.bindPopup(html, { closeButton: true, autoPan: true }).openPopup();
     if (onPickStreet && props.name) onPickStreet(props.name);

@@ -315,6 +315,129 @@ h3 {
 .chip[aria-pressed="true"] .chip-count { color: rgba(255, 255, 255, 0.7); }
 .chip[data-key="_all"] .chip-dot { display: none; }
 
+/* Range chip: same chip family, different look so it reads as "scope" not "category". */
+.range-chip-wrap { margin-left: auto; }
+.chip.range-chip {
+  background: var(--bg);
+  border: 1px dashed var(--border-strong);
+  color: var(--text-soft);
+  gap: 0.45rem;
+}
+.chip.range-chip:hover { background: var(--surface); border-color: var(--text-soft); }
+.chip.range-chip.range-chip-active {
+  background: var(--accent-light);
+  border: 1px solid var(--accent);
+  color: var(--accent-deep);
+}
+.chip.range-chip .chip-cal { font-size: 0.9rem; line-height: 1; }
+.chip.range-chip .range-chip-label { font-weight: 600; }
+.chip.range-chip .range-chip-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+.chip.range-chip .range-chip-clear:hover { background: var(--accent-deep); }
+
+/* From/to popover (mobile fallback + keyboard-friendly desktop) */
+.range-popover {
+  position: fixed;
+  z-index: 600;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 32px rgba(0,0,0,0.15);
+  padding: 0.9rem;
+  min-width: 260px;
+}
+.range-popover[hidden] { display: none; }
+.range-popover-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+  margin-bottom: 0.75rem;
+}
+.range-popover-row label {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  gap: 0.3rem;
+}
+.range-popover-row select {
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 0.45rem 0.55rem;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--text-soft) 50%), linear-gradient(135deg, var(--text-soft) 50%, transparent 50%);
+  background-position: calc(100% - 14px) center, calc(100% - 9px) center;
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+  padding-right: 1.75rem;
+}
+.range-popover-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+.range-popover-actions button {
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 500;
+  padding: 0.4rem 0.8rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--bg);
+  color: var(--text-soft);
+  cursor: pointer;
+}
+.range-popover-actions button:hover { background: var(--surface); color: var(--text); }
+.range-popover-actions button.primary {
+  background: var(--text);
+  color: var(--bg);
+  border-color: var(--text);
+}
+.range-popover-actions button.primary:hover { background: var(--accent-deep); border-color: var(--accent-deep); }
+
+/* Sparkline brush layer */
+.brush-band {
+  fill: var(--accent);
+  fill-opacity: 0.12;
+  pointer-events: none;
+}
+.brush-edge {
+  stroke: var(--accent);
+  stroke-width: 1.25;
+  pointer-events: none;
+}
+.brush-handle {
+  fill: transparent;
+  cursor: ew-resize;
+}
+.brush-handle:hover { fill: var(--accent); fill-opacity: 0.18; }
+.brush-body {
+  fill: transparent;
+  cursor: grab;
+}
+.brush-body:active { cursor: grabbing; }
+.sparkline { cursor: crosshair; }
+
 /* ============================ MAP ============================ */
 
 #map-section { padding-top: 0.5rem; padding-bottom: 1.5rem; }

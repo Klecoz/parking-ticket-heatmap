@@ -4,7 +4,10 @@ import { mountChips } from './chips.js';
 import { mountLeaderboard } from './leaderboard.js';
 import { mountLookup, selectStreet } from './lookup.js';
 import { highlightStreet, mountMap } from './map.js';
+import { mountRange } from './range.js';
+import { subscribe } from './state.js';
 import { mountTimeView } from './time.js';
+import { getTotalCount, initTimeIndex } from './timeIndex.js';
 import { fmt } from './util.js';
 
 (async () => {
@@ -16,11 +19,12 @@ import { fmt } from './util.js';
   }, { passive: true });
   backToTop.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
 
-  let meta, streets, time, streetsFc;
+  let meta, streets, streetsTime, time, streetsFc;
   try {
-    [meta, streets, time, streetsFc] = await Promise.all([
+    [meta, streets, streetsTime, time, streetsFc] = await Promise.all([
       fetchJson('data/meta.json'),
       fetchJson('data/streets.json'),
+      fetchJson('data/streets-time.json'),
       fetchJson('data/time.json'),
       fetchJson('data/streets.geojson'),
     ]);
@@ -29,6 +33,9 @@ import { fmt } from './util.js';
     document.getElementById('headerCurrency').textContent = 'Data unavailable';
     return;
   }
+
+  // Must be called before any component reads from timeIndex.
+  initTimeIndex({ streetsTime, streets });
 
   paintHeader(meta);
   paintHeroStats(meta);
@@ -42,10 +49,17 @@ import { fmt } from './util.js';
   };
 
   mountChips({ catalog });
+  mountRange({ months: meta.months || [] });
   mountMap({ streetsFc, onStreetSelected });
-  mountTimeView({ time, catalog });
-  mountLookup({ streets, catalog, onStreetSelected });
-  mountLeaderboard({ streets, catalog, onStreetSelected });
+  mountTimeView({ time, catalog, months: meta.months || [] });
+  mountLookup({ streets, catalog, months: meta.months || [], onStreetSelected });
+  mountLeaderboard({ streets, catalog, months: meta.months || [], onStreetSelected });
+
+  // Keep hero "Tickets" stat in sync with filter + range.
+  const hsTickets = document.getElementById('hsTickets');
+  subscribe((state) => {
+    if (hsTickets) hsTickets.textContent = fmt(getTotalCount(state));
+  });
 })();
 
 async function fetchJson(url) {

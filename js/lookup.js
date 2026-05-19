@@ -1,18 +1,23 @@
-// Street search + stats card. Both react to filter changes.
+// Street search + stats card. Both react to filter + range changes.
 
-import { getFilter, subscribe } from './state.js';
+import { getFilter, getRange, getState, subscribe } from './state.js';
+import { getStreetCounts, getStreetSlice } from './timeIndex.js';
 import { fmt, normalizeStreet, titleCase } from './util.js';
 
 let allStreets = null;
 let streetIndex = null; // [{ norm, display, count }] sorted by count desc — used for search ranking
 let catalogByKey = null;
+let metaMonths = [];    // ["2024-01", ...] — threaded from app.js for range labels
 let onPick = null;
 let activeStreet = null;
 let totalStreetCount = 0;
 
-export function mountLookup({ streets, catalog, onStreetSelected }) {
+const _MN_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+export function mountLookup({ streets, catalog, months, onStreetSelected }) {
   allStreets = streets;
   catalogByKey = new Map(catalog.map(c => [c.key, c]));
+  metaMonths = months || [];
   onPick = onStreetSelected;
 
   streetIndex = Object.entries(streets)
@@ -32,7 +37,7 @@ function setupSearch() {
   function close() { sug.classList.remove('open'); sug.innerHTML = ''; activeIdx = -1; }
   function open(matches) {
     sug.innerHTML = '';
-    matches.forEach((m, i) => {
+    matches.forEach((m, _i) => {
       const li = document.createElement('li');
       li.role = 'option';
       li.dataset.norm = m.norm;
@@ -85,6 +90,28 @@ export function selectStreet(norm) {
   renderStatsCard();
 }
 
+// Format a short scope label from the active range, e.g. "in March 2026" or "since 2024".
+function scopeLabel(range, months) {
+  if (!range || !months.length) return 'since 2024';
+  const MN_LONG = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const fmtLong = (ym) => {
+    if (!ym) return '';
+    const [y, m] = String(ym).split('-');
+    return `${MN_LONG[parseInt(m, 10) - 1] || m} ${y}`;
+  };
+  if (range.fromIdx === range.toIdx) {
+    return `in ${fmtLong(months[range.fromIdx])}`;
+  }
+  const fromYM = months[range.fromIdx];
+  const toYM = months[range.toIdx];
+  const fromYear = fromYM?.slice(0, 4);
+  const toYear = toYM?.slice(0, 4);
+  if (fromYear === toYear) {
+    return `in ${fromYear}`;
+  }
+  return `${fromYear}–${toYear}`;
+}
+
 function renderStatsCard() {
   const card = document.getElementById('statsCard');
   if (!activeStreet || !allStreets[activeStreet]) {
@@ -94,31 +121,49 @@ function renderStatsCard() {
   }
   card.classList.remove('empty');
 
+  const state = getState();
   const v = allStreets[activeStreet];
   const f = getFilter();
-  const filteredCount = f === '_all' ? v.count : (v.byViolation?.[f] || 0);
-  const totalStreets = totalStreetCount;
-  // Percentile under the active filter: rank by current count, ascending = better.
-  // Using stored rank for _all; recompute when filtered.
-  let rank;
-  if (f === '_all') {
-    rank = v.rank;
-  } else {
-    let r = 1;
-    for (const norm in allStreets) {
-      if (norm === activeStreet) continue;
-      const cmp = allStreets[norm].byViolation?.[f] || 0;
-      if (cmp > filteredCount) r++;
-    }
-    rank = r;
+  const range = getRange();
+
+  // Use timeIndex for count (handles range correctly).
+  const slice = getStreetSlice(activeStreet, state);
+  const filteredCount = slice
+    ? (f === '_all' ? slice.total : (slice.byViolation?.[f] || 0))
+    : 0;
+
+  // Rank: count streets with higher count than current in the active scope.
+  const counts = getStreetCounts(state);
+  let rank = 1;
+  for (const [norm, c] of counts) {
+    if (norm !== activeStreet && c > filteredCount) rank++;
   }
+
+  const totalStreets = totalStreetCount;
   const percentile = totalStreets > 0
     ? Math.round(((totalStreets - rank) / totalStreets) * 100)
     : 0;
   const rankClass = percentile >= 99 ? 'worst' : percentile >= 90 ? 'bad' : '';
 
-  const topViolations = (v.topViolations || []).slice(0, 3);
-  const filterLabel = f === '_all' ? 'all violations' : catalogByKey.get(f)?.label;
+  const filterLabel = f === '_all' ? 'all violations' : (catalogByKey.get(f)?.label || f);
+  // Build top violations list.
+  let violationRows = '';
+  if (slice?.ranked) {
+    // No range: use raw-desc top violations from streets.json.
+    const topViolations = (v.topViolations || []).slice(0, 3);
+    violationRows = topViolations.map(tv => `
+      <li><span>${escapeHtml(tv.desc)}</span><span class="v-count">${fmt(tv.count)}</span></li>
+    `).join('') || '<li><span class="stats-empty">No data for this filter.</span></li>';
+  } else {
+    // Range active: use topViolations keyed by violation key, look up label via catalog.
+    const topViolations = (slice?.topViolations || []).slice(0, 3);
+    violationRows = topViolations.map(tv => `
+      <li><span>${escapeHtml(catalogByKey.get(tv.key)?.label || tv.key)}</span><span class="v-count">${fmt(tv.count)}</span></li>
+    `).join('') || '<li><span class="stats-empty">No data for this filter.</span></li>';
+  }
+
+  // Build scope label from range for the headline using stored metaMonths.
+  const headlineScope = scopeLabel(range, metaMonths);
 
   card.innerHTML = `
     <div class="stats-header">
@@ -127,7 +172,7 @@ function renderStatsCard() {
     </div>
     <p class="stats-headline">
       <strong>${fmt(filteredCount)}</strong> ${filteredCount === 1 ? 'ticket' : 'tickets'}
-      since 2024 &middot; ${escapeHtml(filterLabel)}.
+      ${escapeHtml(headlineScope)} &middot; ${escapeHtml(filterLabel)}.
     </p>
     <div class="pctile" aria-label="Citywide percentile">
       <div class="pctile-label"><span>Citywide percentile</span><strong>worse than ${percentile}% of streets</strong></div>
@@ -136,9 +181,7 @@ function renderStatsCard() {
     <div class="stats-violations">
       <h5>Top violations on this street</h5>
       <ul class="violation-list">
-        ${topViolations.map(tv => `
-          <li><span>${escapeHtml(tv.desc)}</span><span class="v-count">${fmt(tv.count)}</span></li>
-        `).join('') || '<li><span class="stats-empty">No data for this filter.</span></li>'}
+        ${violationRows}
       </ul>
     </div>
   `;

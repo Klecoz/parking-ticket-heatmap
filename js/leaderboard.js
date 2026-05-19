@@ -1,16 +1,21 @@
-// Inline leaderboard with horizontal bars. Reacts to filter changes.
+// Inline leaderboard with horizontal bars. Reacts to filter + range changes.
 
-import { getFilter, subscribe } from './state.js';
+import { getFilter, getRange, getState, subscribe } from './state.js';
+import { getStreetCounts } from './timeIndex.js';
 import { fmt, titleCase } from './util.js';
 
 let allStreets = null;          // { [norm]: { display, count, byViolation, ... } }
 let catalogByKey = null;
+let metaMonths = [];            // ["2024-01", ...]
 let showAll = false;
 let onPick = null;
 
-export function mountLeaderboard({ streets, catalog, onStreetSelected }) {
+const MN_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+export function mountLeaderboard({ streets, catalog, months, onStreetSelected }) {
   allStreets = streets;
   catalogByKey = new Map(catalog.map(c => [c.key, c]));
+  metaMonths = months || [];
   onPick = onStreetSelected;
 
   document.getElementById('leaderboardMore').addEventListener('click', () => {
@@ -27,15 +32,28 @@ function activeLabel() {
   return f === '_all' ? 'all violations' : (catalogByKey?.get(f)?.label?.toLowerCase() || f);
 }
 
+// Format a range object to a short human label, e.g. "Mar '25" or "Mar '25 – May '26".
+function formatRangeLabel(range, months) {
+  if (!range || !months.length) return null;
+  const fmt0 = (ym) => {
+    const [y, m] = String(ym).split('-');
+    return `${MN_SHORT[parseInt(m, 10) - 1] || m} '${y.slice(2)}`;
+  };
+  if (range.fromIdx === range.toIdx) return fmt0(months[range.fromIdx]);
+  return `${fmt0(months[range.fromIdx])} – ${fmt0(months[range.toIdx])}`;
+}
+
 function render() {
-  const f = getFilter();
+  const state = getState();
   const limit = showAll ? 100 : 20;
 
-  // Compute ranked list for the current filter.
+  // Get per-street counts from timeIndex (handles both fast-path and range-path).
+  const counts = getStreetCounts(state);
+
   const ranked = [];
-  for (const [norm, v] of Object.entries(allStreets)) {
-    const c = f === '_all' ? v.count : (v.byViolation?.[f] || 0);
-    if (c > 0) ranked.push({ norm, display: v.display, count: c });
+  for (const [norm, count] of counts) {
+    const display = allStreets[norm]?.display;
+    if (display) ranked.push({ norm, display, count });
   }
   ranked.sort((a, b) => b.count - a.count);
 
@@ -71,7 +89,7 @@ function render() {
     bar.appendChild(fill);
     btn.appendChild(bar);
 
-    btn.addEventListener('click', () => onPick && onPick(s.norm));
+    btn.addEventListener('click', () => onPick?.(s.norm));
     li.appendChild(btn);
 
     const count = document.createElement('span');
@@ -90,6 +108,12 @@ function render() {
     more.textContent = showAll ? '← Show only top 20' : `Show next ${Math.min(80, ranked.length - 20)} →`;
   }
 
+  const rangeLabel = formatRangeLabel(getRange(), metaMonths);
+  const rangePart = rangeLabel ? ` · ${rangeLabel}` : '';
   document.getElementById('leaderboardMode').innerHTML =
-    `Top ${top.length} &middot; <strong>${activeLabel()}</strong>`;
+    `Top ${top.length} &middot; <strong>${activeLabel()}</strong>${escapeHtml(rangePart)}`;
+}
+
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }

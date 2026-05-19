@@ -184,6 +184,10 @@ function aggregate(rows) {
   const monthly         = new Map();      // raw desc -> Map<ym, n>
   const hourByDayAll    = Array.from({ length: 7 }, () => new Array(24).fill(0));
   const monthlyAll      = new Map();
+  // New: per-street per-month per-rawDesc counts (sparse)
+  const streetMonthly   = new Map();      // norm -> Map<ym, Map<rawDesc, n>>
+  // New: per-month per-rawDesc hour×day matrices
+  const hourByDayByMonth = new Map();     // ym -> Map<rawDesc, int[7][24]>
   let dateMin = null, dateMax = null;
   let kept = 0, withTime = 0;
 
@@ -214,6 +218,13 @@ function aggregate(rows) {
         const m = monthly.get(desc);
         m.set(ym, (m.get(ym) || 0) + 1);
 
+        // Accumulate per-street per-month per-rawDesc
+        if (!streetMonthly.has(norm)) streetMonthly.set(norm, new Map());
+        const smNorm = streetMonthly.get(norm);
+        if (!smNorm.has(ym)) smNorm.set(ym, new Map());
+        const smYm = smNorm.get(ym);
+        smYm.set(desc, (smYm.get(desc) || 0) + 1);
+
         const dow = d.getUTCDay();
         const hour = parseHour(r.viotime);
         if (hour != null) {
@@ -221,6 +232,12 @@ function aggregate(rows) {
           hourByDayAll[dow][hour] += 1;
           if (!hourByDay.has(desc)) hourByDay.set(desc, Array.from({ length: 7 }, () => new Array(24).fill(0)));
           hourByDay.get(desc)[dow][hour] += 1;
+
+          // Accumulate per-month per-rawDesc hour×day
+          if (!hourByDayByMonth.has(ym)) hourByDayByMonth.set(ym, new Map());
+          const ymMap = hourByDayByMonth.get(ym);
+          if (!ymMap.has(desc)) ymMap.set(desc, Array.from({ length: 7 }, () => new Array(24).fill(0)));
+          ymMap.get(desc)[dow][hour] += 1;
         }
         if (dateMin == null || d < dateMin) dateMin = d;
         if (dateMax == null || d > dateMax) dateMax = d;
@@ -228,7 +245,7 @@ function aggregate(rows) {
     }
   }
 
-  return { violationTotals, streetTotals, hourByDay, monthly, hourByDayAll, monthlyAll, dateMin, dateMax, kept, withTime };
+  return { violationTotals, streetTotals, hourByDay, monthly, hourByDayAll, monthlyAll, streetMonthly, hourByDayByMonth, dateMin, dateMax, kept, withTime };
 }
 
 function buildCatalog(violationTotals) {
@@ -295,6 +312,42 @@ function buildStreetIndex(streetTotals, descToKey) {
   return { streets: out, ranked: sorted };
 }
 
+function buildStreetsTime(streetMonthly, catalog, descToKey) {
+  // Build sparse per-street × per-month × per-violation output.
+  const violationKeys = catalog.map(c => c.key); // length 7 (top6 + other)
+  const violationKeyIndex = new Map(violationKeys.map((k, i) => [k, i]));
+
+  // Collect all months seen across all streets, sorted ascending.
+  const monthSet = new Set();
+  for (const ymMap of streetMonthly.values()) {
+    for (const ym of ymMap.keys()) monthSet.add(ym);
+  }
+  const months = [...monthSet].sort();
+  const monthIndex = new Map(months.map((ym, i) => [ym, i]));
+
+  const byStreet = {};
+  for (const [norm, ymMap] of streetMonthly) {
+    const tuples = [];
+    for (const [ym, rawDescMap] of ymMap) {
+      const idx = monthIndex.get(ym);
+      const vec = new Array(violationKeys.length).fill(0);
+      let total = 0;
+      for (const [desc, n] of rawDescMap) {
+        const key = descToKey.get(desc) || 'other';
+        const vi = violationKeyIndex.get(key);
+        if (vi !== undefined) { vec[vi] += n; total += n; }
+      }
+      if (total > 0) tuples.push([idx, vec]);
+    }
+    if (tuples.length > 0) {
+      tuples.sort((a, b) => a[0] - b[0]);
+      byStreet[norm] = tuples;
+    }
+  }
+
+  return { months, violations: violationKeys, byStreet };
+}
+
 function buildStreetsGeoJSON(streetFc, streetIndex, descToKey) {
   // For each street feature, simplify geometry + attach aggregate properties keyed by normalized name.
   // Drop features that don't simplify to a usable line.
@@ -328,7 +381,7 @@ function buildStreetsGeoJSON(streetFc, streetIndex, descToKey) {
   return { type: 'FeatureCollection', features };
 }
 
-function buildTimeJson(hourByDay, monthly, hourByDayAll, monthlyAll, descToKey) {
+function buildTimeJson(hourByDay, monthly, hourByDayAll, monthlyAll, hourByDayByMonthRaw, catalog, descToKey) {
   const hourByDayByViolation = {
     _all: hourByDayAll,
   };
@@ -356,7 +409,33 @@ function buildTimeJson(hourByDay, monthly, hourByDayAll, monthlyAll, descToKey) 
   for (const [key, m] of mBucket) {
     monthlyByViolation[key] = [...m.entries()].sort().map(([ym, n]) => ({ ym, n }));
   }
-  return { hourByDayByViolation, monthlyByViolation };
+
+  // Build per-month hour×day-by-violation (_all + top6 + other).
+  const violationKeys = catalog.map(c => c.key); // top6 + other
+  const allMonths = [...hourByDayByMonthRaw.keys()].sort();
+  const zeroMat = () => Array.from({ length: 7 }, () => new Array(24).fill(0));
+
+  const hourByDayByMonth = {};
+  for (const ym of allMonths) {
+    const rawDescMap = hourByDayByMonthRaw.get(ym); // Map<rawDesc, int[7][24]>
+    // Bucket by violation key.
+    const keyMats = new Map(); // key -> int[7][24]
+    const allMat = zeroMat();
+    for (const [desc, mat] of rawDescMap) {
+      const key = descToKey.get(desc) || 'other';
+      if (!keyMats.has(key)) keyMats.set(key, zeroMat());
+      const dst = keyMats.get(key);
+      for (let d = 0; d < 7; d++) for (let h = 0; h < 24; h++) {
+        dst[d][h] += mat[d][h];
+        allMat[d][h] += mat[d][h];
+      }
+    }
+    const entry = { _all: allMat };
+    for (const vk of violationKeys) entry[vk] = keyMats.get(vk) || zeroMat();
+    hourByDayByMonth[ym] = entry;
+  }
+
+  return { hourByDayByViolation, monthlyByViolation, hourByDayByMonth };
 }
 
 (async () => {
@@ -375,7 +454,8 @@ function buildTimeJson(hourByDay, monthly, hourByDayAll, monthlyAll, descToKey) 
 
   const streetIndex = buildStreetIndex(agg.streetTotals, descToKey);
   const streetsGeoJSON = buildStreetsGeoJSON(streetFc, streetIndex, descToKey);
-  const timeJson = buildTimeJson(agg.hourByDay, agg.monthly, agg.hourByDayAll, agg.monthlyAll, descToKey);
+  const timeJson = buildTimeJson(agg.hourByDay, agg.monthly, agg.hourByDayAll, agg.monthlyAll, agg.hourByDayByMonth, catalog, descToKey);
+  const streetsTime = buildStreetsTime(agg.streetMonthly, catalog, descToKey);
 
   // Strip rawDesc from catalog before writing meta (internal mapping only).
   const publicCatalog = catalog.map(({ rawDesc, ...rest }) => rest);
@@ -394,22 +474,25 @@ function buildTimeJson(hourByDay, monthly, hourByDayAll, monthlyAll, descToKey) 
       to:   agg.dateMax.toISOString().slice(0, 10),
     } : null,
     violationCatalog: publicCatalog,
+    months: streetsTime.months,
     sample: false,
   };
 
-  const streetsGeoPath = resolve(OUT_DIR, 'streets.geojson');
-  const streetsPath    = resolve(OUT_DIR, 'streets.json');
-  const timePath       = resolve(OUT_DIR, 'time.json');
-  const metaPath       = resolve(OUT_DIR, 'meta.json');
+  const streetsGeoPath  = resolve(OUT_DIR, 'streets.geojson');
+  const streetsPath     = resolve(OUT_DIR, 'streets.json');
+  const timePath        = resolve(OUT_DIR, 'time.json');
+  const metaPath        = resolve(OUT_DIR, 'meta.json');
+  const streetsTimePath = resolve(OUT_DIR, 'streets-time.json');
   const obsoleteHeatmap = resolve(OUT_DIR, 'heatmap.json');
 
-  writeFileSync(streetsGeoPath, JSON.stringify(streetsGeoJSON));
-  writeFileSync(streetsPath,    JSON.stringify(streetIndex.streets));
-  writeFileSync(timePath,       JSON.stringify(timeJson));
-  writeFileSync(metaPath,       JSON.stringify(meta, null, 2));
+  writeFileSync(streetsGeoPath,  JSON.stringify(streetsGeoJSON));
+  writeFileSync(streetsPath,     JSON.stringify(streetIndex.streets));
+  writeFileSync(timePath,        JSON.stringify(timeJson));
+  writeFileSync(metaPath,        JSON.stringify(meta, null, 2));
+  writeFileSync(streetsTimePath, JSON.stringify(streetsTime));
   if (existsSync(obsoleteHeatmap)) unlinkSync(obsoleteHeatmap);
 
-  const paths = [streetsGeoPath, streetsPath, timePath, metaPath];
+  const paths = [streetsGeoPath, streetsPath, timePath, metaPath, streetsTimePath];
   let totalBytes = 0;
   console.log('\nWrote:');
   for (const p of paths) {
