@@ -1,10 +1,66 @@
 {
-  "generatedAt": null,
-  "since": null,
-  "rowCount": 0,
-  "geolocatedRowCount": 0,
-  "streetCount": 20,
+  "generatedAt": "2026-05-19T04:21:33.263Z",
+  "since": "2024-01-01",
+  "rowCount": 320983,
+  "keptRowCount": 320983,
+  "withTimeRowCount": 316824,
+  "streetCount": 3530,
   "rawId": "yvvn-sykd",
-  "streetId": "es5y-a4h6",
-  "sample": true
+  "streetsId": "dbwm-jgtt",
+  "dateRange": {
+    "from": "2024-01-01",
+    "to": "2026-05-14"
+  },
+  "violationCatalog": [
+    {
+      "key": "alternate_parking",
+      "label": "Alternate Parking",
+      "color": "#1a6b4a",
+      "count": 136471,
+      "shareOfTotal": 0.4251658187505257
+    },
+    {
+      "key": "no_standing",
+      "label": "No Standing",
+      "color": "#0b7ab1",
+      "count": 36605,
+      "shareOfTotal": 0.1140403074306116
+    },
+    {
+      "key": "no_parking",
+      "label": "No Parking",
+      "color": "#b48a00",
+      "count": 28336,
+      "shareOfTotal": 0.08827881850440678
+    },
+    {
+      "key": "expired_inspection_sticker_all",
+      "label": "Expired Inspection Sticker (All)",
+      "color": "#8a4a8a",
+      "count": 25491,
+      "shareOfTotal": 0.07941542075437016
+    },
+    {
+      "key": "meter_overtime",
+      "label": "Meter Overtime",
+      "color": "#c2453a",
+      "count": 20401,
+      "shareOfTotal": 0.06355788312776689
+    },
+    {
+      "key": "expired_registration_sticker",
+      "label": "Expired Registration Sticker",
+      "color": "#5a8a3a",
+      "count": 14918,
+      "shareOfTotal": 0.04647598159404081
+    },
+    {
+      "key": "other",
+      "label": "Other",
+      "color": "#8a8a8a",
+      "count": 58761,
+      "shareOfTotal": 0.18306576983827805
+    }
+  ],
+  "sample": false
 }

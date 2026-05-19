@@ -1,15 +1,19 @@
 #!/usr/bin/env node
-// Pulls Buffalo parking summons data from data.buffalony.gov (Socrata SODA API)
-// and writes three static JSON artifacts consumed by the /parking-heatmap/ page.
+// Pulls Buffalo parking-summons data + street centerlines from data.buffalony.gov
+// and writes the four static artifacts the /parking-heatmap/ page consumes:
+//   data/streets.geojson  — Buffalo street centerlines joined to per-street ticket totals
+//   data/streets.json     — { [normName]: { display, count, rank, byViolation, topViolations } }
+//   data/time.json        — citywide hour×day and monthly aggregates, sliced by violation
+//   data/meta.json        — generation timestamp, date range, violation catalog (top 6 + other)
 //
 // Usage:
-//   node parking-heatmap/scripts/build-data.js
-//   node parking-heatmap/scripts/build-data.js --since 2023-01-01 --grid 0.0008
-//   node parking-heatmap/scripts/build-data.js --raw-id yvvn-sykd --street-id es5y-a4h6
+//   node scripts/build-data.mjs
+//   node scripts/build-data.mjs --since 2024-01-01
+//   node scripts/build-data.mjs --raw-id yvvn-sykd --streets-id dbwm-jgtt
 //
 // Requires Node 20+ (uses global fetch). No npm install.
 
-import { writeFileSync, mkdirSync, statSync } from 'node:fs';
+import { writeFileSync, mkdirSync, statSync, unlinkSync, existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -24,17 +28,14 @@ const args = Object.fromEntries(
   }, [])
 );
 
-const RAW_ID    = args['raw-id']    || 'yvvn-sykd';
-const STREET_ID = args['street-id'] || 'es5y-a4h6';
-const SINCE     = args['since']     || '2023-01-01';
-const GRID      = parseFloat(args['grid'] || '0.0008');
-const PAGE      = parseInt(args['page-size'] || '50000', 10);
+const RAW_ID     = args['raw-id']     || 'yvvn-sykd';
+const STREETS_ID = args['streets-id'] || 'dbwm-jgtt';
+const SINCE      = args['since']      || '2024-01-01';
+const PAGE       = parseInt(args['page-size'] || '50000', 10);
+const SIMPLIFY_TOL = parseFloat(args['simplify-tol'] || '0.00008'); // ~9m
+const TOP_N_VIOLATIONS = 6;
+const BUDGET_BYTES = 6 * 1024 * 1024;
 const APP_TOKEN = process.env.SOCRATA_APP_TOKEN || '';
-
-const BUFFALO_BBOX = {
-  minLat: 42.82, maxLat: 42.97,
-  minLng: -78.95, maxLng: -78.79,
-};
 
 const headers = APP_TOKEN ? { 'X-App-Token': APP_TOKEN } : {};
 
@@ -42,33 +43,14 @@ async function soda(path) {
   const url = `https://data.buffalony.gov/resource/${path}`;
   const res = await fetch(url, { headers });
   if (!res.ok) {
-    throw new Error(`SODA ${res.status} ${res.statusText}: ${url}`);
+    const body = await res.text().catch(() => '');
+    throw new Error(`SODA ${res.status} ${res.statusText}: ${url}\n${body.slice(0, 300)}`);
   }
   return res.json();
 }
 
-function pickLat(row) {
-  if (row.latitude != null) return parseFloat(row.latitude);
-  if (row.location?.latitude != null) return parseFloat(row.location.latitude);
-  if (row.location?.coordinates?.[1] != null) return row.location.coordinates[1];
-  if (row.geocoded_column?.latitude != null) return parseFloat(row.geocoded_column.latitude);
-  return null;
-}
-
-function pickLng(row) {
-  if (row.longitude != null) return parseFloat(row.longitude);
-  if (row.location?.longitude != null) return parseFloat(row.location.longitude);
-  if (row.location?.coordinates?.[0] != null) return row.location.coordinates[0];
-  if (row.geocoded_column?.longitude != null) return parseFloat(row.geocoded_column.longitude);
-  return null;
-}
-
-function pickStreet(row) {
-  return row.street || row.street_name || row.block || row.address || row.location_street || null;
-}
-
-function pickViolation(row) {
-  return row.violation_description || row.description || row.violation || row.violation_code || 'UNKNOWN';
+function slug(s) {
+  return String(s).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
 }
 
 function normalizeStreet(s) {
@@ -83,144 +65,362 @@ function normalizeStreet(s) {
     .replace(/\bDRIVE\b/g, 'DR')
     .replace(/\bROAD\b/g, 'RD')
     .replace(/\bPLACE\b/g, 'PL')
+    .replace(/\bCOURT\b/g, 'CT')
+    .replace(/\bLANE\b/g, 'LN')
+    .replace(/\bTERRACE\b/g, 'TER')
+    .replace(/\bCIRCLE\b/g, 'CIR')
+    .replace(/\bHIGHWAY\b/g, 'HWY')
+    .replace(/\bNORTH\b/g, 'N')
+    .replace(/\bSOUTH\b/g, 'S')
+    .replace(/\bEAST\b/g, 'E')
+    .replace(/\bWEST\b/g, 'W')
     .replace(/\s+/g, ' ')
     .trim();
 }
 
-function inBuffalo(lat, lng) {
-  return lat >= BUFFALO_BBOX.minLat && lat <= BUFFALO_BBOX.maxLat
-      && lng >= BUFFALO_BBOX.minLng && lng <= BUFFALO_BBOX.maxLng;
+// "10:09:00AM" -> 10; "12:30:00AM" -> 0; "12:30:00PM" -> 12; "11:45:00PM" -> 23
+function parseHour(s) {
+  if (!s) return null;
+  const m = String(s).match(/(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)/i);
+  if (!m) return null;
+  let h = parseInt(m[1], 10);
+  const am = m[3].toUpperCase() === 'AM';
+  if (h === 12) h = am ? 0 : 12;
+  else if (!am) h += 12;
+  return h >= 0 && h < 24 ? h : null;
 }
 
-async function buildHeatmap() {
-  console.log(`[heatmap] paginating ${RAW_ID} since ${SINCE} (page=${PAGE})`);
-  const bins = new Map();
-  let offset = 0;
-  let total = 0;
-  let kept = 0;
+// Squared perpendicular distance from point p to segment a-b.
+function sqSegDist(p, a, b) {
+  let [x, y] = a;
+  let dx = b[0] - x;
+  let dy = b[1] - y;
+  if (dx !== 0 || dy !== 0) {
+    const t = ((p[0] - x) * dx + (p[1] - y) * dy) / (dx * dx + dy * dy);
+    if (t > 1) { x = b[0]; y = b[1]; }
+    else if (t > 0) { x += dx * t; y += dy * t; }
+  }
+  dx = p[0] - x; dy = p[1] - y;
+  return dx * dx + dy * dy;
+}
 
-  while (true) {
-    const path = `${RAW_ID}.json?$limit=${PAGE}&$offset=${offset}`
-      + `&$where=issue_date >= '${SINCE}T00:00:00'`;
-    const rows = await soda(path);
-    if (!rows.length) break;
-    total += rows.length;
-
-    for (const row of rows) {
-      const lat = pickLat(row);
-      const lng = pickLng(row);
-      if (lat == null || lng == null || !inBuffalo(lat, lng)) continue;
-      const bLat = Math.round(lat / GRID) * GRID;
-      const bLng = Math.round(lng / GRID) * GRID;
-      const key = `${bLat.toFixed(5)},${bLng.toFixed(5)}`;
-      bins.set(key, (bins.get(key) || 0) + 1);
-      kept++;
+// Ramer–Douglas–Peucker on a LineString (array of [lng,lat]).
+function simplify(points, tol) {
+  if (points.length < 3) return points;
+  const sqTol = tol * tol;
+  const keep = new Uint8Array(points.length);
+  keep[0] = keep[points.length - 1] = 1;
+  const stack = [[0, points.length - 1]];
+  while (stack.length) {
+    const [s, e] = stack.pop();
+    let maxDist = 0;
+    let index = -1;
+    for (let i = s + 1; i < e; i++) {
+      const d = sqSegDist(points[i], points[s], points[e]);
+      if (d > maxDist) { index = i; maxDist = d; }
     }
-    console.log(`[heatmap] offset=${offset} fetched=${rows.length} kept=${kept}/${total} bins=${bins.size}`);
+    if (maxDist > sqTol && index !== -1) {
+      keep[index] = 1;
+      stack.push([s, index], [index, e]);
+    }
+  }
+  const out = [];
+  for (let i = 0; i < points.length; i++) if (keep[i]) out.push(points[i]);
+  return out;
+}
+
+function simplifyGeometry(g, tol) {
+  if (g.type === 'LineString') return { type: 'LineString', coordinates: simplify(g.coordinates, tol) };
+  if (g.type === 'MultiLineString') {
+    return {
+      type: 'MultiLineString',
+      coordinates: g.coordinates.map(line => simplify(line, tol)).filter(l => l.length >= 2),
+    };
+  }
+  return g;
+}
+
+async function fetchTickets() {
+  console.log(`[tickets] paginating ${RAW_ID} since ${SINCE} (page=${PAGE})`);
+  const select = 'summdt,viotime,viodesc,violation_street';
+  const where  = `summdt >= '${SINCE}T00:00:00'`;
+  const out = [];
+  let offset = 0;
+  while (true) {
+    const url = `${RAW_ID}.json`
+      + `?$select=${encodeURIComponent(select)}`
+      + `&$where=${encodeURIComponent(where)}`
+      + `&$order=${encodeURIComponent(':id')}`
+      + `&$limit=${PAGE}&$offset=${offset}`;
+    const rows = await soda(url);
+    if (!rows.length) break;
+    out.push(...rows);
+    console.log(`[tickets] offset=${offset} fetched=${rows.length} total=${out.length}`);
     if (rows.length < PAGE) break;
     offset += PAGE;
   }
-
-  const points = [...bins.entries()].map(([k, w]) => {
-    const [lat, lng] = k.split(',').map(parseFloat);
-    return [lat, lng, w];
-  });
-  console.log(`[heatmap] ${points.length} bins from ${kept} geolocated rows (${total} total)`);
-  return { points, total, kept };
+  return out;
 }
 
-async function buildStreetStats() {
-  console.log(`[streets] aggregating ${RAW_ID} by street + violation since ${SINCE}`);
-  const path = `${RAW_ID}.json`
-    + `?$select=street,violation_description,count(*) as c`
-    + `&$where=issue_date >= '${SINCE}T00:00:00' AND street IS NOT NULL`
-    + `&$group=street,violation_description`
-    + `&$order=c DESC&$limit=200000`;
+async function fetchStreetsGeoJSON() {
+  console.log(`[streets] fetching ${STREETS_ID} (Buffalo + drivable)`);
+  // Filter server-side to Buffalo + non-null streetname; exclude parking lots (label="Parking Lot").
+  const where = `(leftcitytownname='Buffalo' OR rightcitytownname='Buffalo') AND streetname IS NOT NULL AND label != 'Parking Lot'`;
+  const url = `${STREETS_ID}.geojson?$where=${encodeURIComponent(where)}&$limit=20000`;
+  const fc = await soda(url);
+  console.log(`[streets] fetched ${fc.features.length} street segments`);
+  return fc;
+}
 
-  let rows;
-  try {
-    rows = await soda(path);
-  } catch (err) {
-    console.warn(`[streets] grouped query failed (${err.message}); falling back to ${STREET_ID}`);
-    rows = await soda(`${STREET_ID}.json?$limit=200000`);
-  }
+function streetDisplayFromFeature(props) {
+  // Prefer `label` ("N Ogden St"); fall back to streetname.
+  return props.label || props.completestreetname || props.streetname || null;
+}
 
-  const byStreet = new Map();
+function aggregate(rows) {
+  const violationTotals = new Map();      // raw desc -> count
+  const streetTotals    = new Map();      // norm -> { display, count, byRawViolation: Map }
+  const hourByDay       = new Map();      // raw desc -> int[7][24]
+  const monthly         = new Map();      // raw desc -> Map<ym, n>
+  const hourByDayAll    = Array.from({ length: 7 }, () => new Array(24).fill(0));
+  const monthlyAll      = new Map();
+  let dateMin = null, dateMax = null;
+  let kept = 0, withTime = 0;
+
   for (const r of rows) {
-    const display = pickStreet(r);
-    if (!display) continue;
-    const norm = normalizeStreet(display);
+    const desc = (r.viodesc || 'UNKNOWN').trim().toUpperCase();
+    const streetRaw = r.violation_street;
+    const norm = normalizeStreet(streetRaw);
     if (!norm) continue;
-    const c = parseInt(r.c || r.count || r.summonses || r.total || '1', 10);
-    const violation = pickViolation(r);
-    const entry = byStreet.get(norm) || { display, count: 0, violations: new Map() };
-    entry.count += c;
-    entry.violations.set(violation, (entry.violations.get(violation) || 0) + c);
-    if (display.length < entry.display.length) entry.display = display;
-    byStreet.set(norm, entry);
+    kept++;
+    violationTotals.set(desc, (violationTotals.get(desc) || 0) + 1);
+
+    const entry = streetTotals.get(norm) || {
+      display: streetRaw,
+      count: 0,
+      byRawViolation: new Map(),
+    };
+    entry.count += 1;
+    entry.byRawViolation.set(desc, (entry.byRawViolation.get(desc) || 0) + 1);
+    if (String(streetRaw).length < String(entry.display).length) entry.display = streetRaw;
+    streetTotals.set(norm, entry);
+
+    if (r.summdt) {
+      const d = new Date(r.summdt);
+      if (!Number.isNaN(d.getTime())) {
+        const ym = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+        monthlyAll.set(ym, (monthlyAll.get(ym) || 0) + 1);
+        if (!monthly.has(desc)) monthly.set(desc, new Map());
+        const m = monthly.get(desc);
+        m.set(ym, (m.get(ym) || 0) + 1);
+
+        const dow = d.getUTCDay();
+        const hour = parseHour(r.viotime);
+        if (hour != null) {
+          withTime++;
+          hourByDayAll[dow][hour] += 1;
+          if (!hourByDay.has(desc)) hourByDay.set(desc, Array.from({ length: 7 }, () => new Array(24).fill(0)));
+          hourByDay.get(desc)[dow][hour] += 1;
+        }
+        if (dateMin == null || d < dateMin) dateMin = d;
+        if (dateMax == null || d > dateMax) dateMax = d;
+      }
+    }
   }
 
-  const sorted = [...byStreet.entries()]
-    .map(([norm, v]) => ({
-      norm,
-      display: v.display,
-      count: v.count,
-      topViolations: [...v.violations.entries()]
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 3)
-        .map(([desc, count]) => ({ desc, count })),
-    }))
-    .sort((a, b) => b.count - a.count);
+  return { violationTotals, streetTotals, hourByDay, monthly, hourByDayAll, monthlyAll, dateMin, dateMax, kept, withTime };
+}
 
+function buildCatalog(violationTotals) {
+  // Top N by count; everything else lumped under 'other'.
+  const total = [...violationTotals.values()].reduce((s, n) => s + n, 0);
+  const sorted = [...violationTotals.entries()].sort((a, b) => b[1] - a[1]);
+  const top = sorted.slice(0, TOP_N_VIOLATIONS);
+  const tail = sorted.slice(TOP_N_VIOLATIONS);
+  const tailCount = tail.reduce((s, [, n]) => s + n, 0);
+
+  // Color ramp (perceptual, accessible against bg/surface). Last is 'other' = grey.
+  const palette = ['#1a6b4a', '#0b7ab1', '#b48a00', '#8a4a8a', '#c2453a', '#5a8a3a', '#8a8a8a'];
+  const catalog = top.map(([desc, n], i) => ({
+    key: slug(desc),
+    label: titleCase(desc),
+    rawDesc: desc,
+    color: palette[i],
+    count: n,
+    shareOfTotal: total ? n / total : 0,
+  }));
+  catalog.push({
+    key: 'other',
+    label: 'Other',
+    rawDesc: null,
+    color: palette[6],
+    count: tailCount,
+    shareOfTotal: total ? tailCount / total : 0,
+  });
+  const descToKey = new Map();
+  for (const c of catalog) if (c.rawDesc) descToKey.set(c.rawDesc, c.key);
+  return { catalog, descToKey };
+}
+
+function titleCase(s) {
+  return String(s).toLowerCase().replace(/\b([a-z])([a-z0-9']*)/g, (_, a, b) => a.toUpperCase() + b);
+}
+
+function bucketByViolation(rawMap, descToKey) {
+  // Map a raw-desc -> count map to a key (top6+other) -> count map. Sparse: omit zeros.
+  const out = {};
+  for (const [desc, n] of rawMap) {
+    const key = descToKey.get(desc) || 'other';
+    out[key] = (out[key] || 0) + n;
+  }
+  return out;
+}
+
+function buildStreetIndex(streetTotals, descToKey) {
+  const sorted = [...streetTotals.entries()]
+    .map(([norm, v]) => ({ norm, ...v }))
+    .sort((a, b) => b.count - a.count);
   const out = {};
   sorted.forEach((s, i) => {
+    const byViolation = bucketByViolation(s.byRawViolation, descToKey);
+    const topRaw = [...s.byRawViolation.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3);
     out[s.norm] = {
-      display: s.display,
+      display: String(s.display),
       count: s.count,
       rank: i + 1,
-      topViolations: s.topViolations,
+      byViolation,
+      topViolations: topRaw.map(([desc, count]) => ({ desc: titleCase(desc), count })),
     };
   });
-  console.log(`[streets] ${sorted.length} unique streets`);
-  return { streets: out, streetCount: sorted.length };
+  return { streets: out, ranked: sorted };
+}
+
+function buildStreetsGeoJSON(streetFc, streetIndex, descToKey) {
+  // For each street feature, simplify geometry + attach aggregate properties keyed by normalized name.
+  // Drop features that don't simplify to a usable line.
+  const features = [];
+  let matched = 0;
+  for (const f of streetFc.features) {
+    const display = streetDisplayFromFeature(f.properties || {});
+    if (!display) continue;
+    const norm = normalizeStreet(display);
+    const stat = streetIndex.streets[norm];
+    const geom = simplifyGeometry(f.geometry, SIMPLIFY_TOL);
+    const hasGeom = geom && (
+      (geom.type === 'LineString' && geom.coordinates.length >= 2) ||
+      (geom.type === 'MultiLineString' && geom.coordinates.some(l => l.length >= 2))
+    );
+    if (!hasGeom) continue;
+    if (stat) matched++;
+    features.push({
+      type: 'Feature',
+      geometry: geom,
+      properties: {
+        name: norm,
+        display: stat ? stat.display : display,
+        count: stat ? stat.count : 0,
+        rank: stat ? stat.rank : null,
+        byViolation: stat ? stat.byViolation : {},
+      },
+    });
+  }
+  console.log(`[streets] matched ${matched} / ${features.length} segments to ticket data`);
+  return { type: 'FeatureCollection', features };
+}
+
+function buildTimeJson(hourByDay, monthly, hourByDayAll, monthlyAll, descToKey) {
+  const hourByDayByViolation = {
+    _all: hourByDayAll,
+  };
+  const monthlyByViolation = {
+    _all: [...monthlyAll.entries()].sort().map(([ym, n]) => ({ ym, n })),
+  };
+
+  // Bucket per-violation arrays into top6+other.
+  const hBucket = new Map(); // key -> int[7][24]
+  for (const [desc, mat] of hourByDay) {
+    const key = descToKey.get(desc) || 'other';
+    if (!hBucket.has(key)) hBucket.set(key, Array.from({ length: 7 }, () => new Array(24).fill(0)));
+    const dst = hBucket.get(key);
+    for (let d = 0; d < 7; d++) for (let h = 0; h < 24; h++) dst[d][h] += mat[d][h];
+  }
+  for (const [key, mat] of hBucket) hourByDayByViolation[key] = mat;
+
+  const mBucket = new Map(); // key -> Map<ym,n>
+  for (const [desc, m] of monthly) {
+    const key = descToKey.get(desc) || 'other';
+    if (!mBucket.has(key)) mBucket.set(key, new Map());
+    const dst = mBucket.get(key);
+    for (const [ym, n] of m) dst.set(ym, (dst.get(ym) || 0) + n);
+  }
+  for (const [key, m] of mBucket) {
+    monthlyByViolation[key] = [...m.entries()].sort().map(([ym, n]) => ({ ym, n }));
+  }
+  return { hourByDayByViolation, monthlyByViolation };
 }
 
 (async () => {
   const startedAt = new Date().toISOString();
-
-  const [heatmap, streetsRes] = await Promise.all([
-    buildHeatmap(),
-    buildStreetStats(),
+  const [ticketRows, streetFc] = await Promise.all([
+    fetchTickets(),
+    fetchStreetsGeoJSON(),
   ]);
 
-  const heatmapPath = resolve(OUT_DIR, 'heatmap.json');
-  const streetsPath = resolve(OUT_DIR, 'streets.json');
-  const metaPath    = resolve(OUT_DIR, 'meta.json');
+  console.log(`[aggregate] ${ticketRows.length} ticket rows`);
+  const agg = aggregate(ticketRows);
+  console.log(`[aggregate] kept=${agg.kept} withTime=${agg.withTime} uniqueStreets=${agg.streetTotals.size} uniqueViolations=${agg.violationTotals.size}`);
 
-  writeFileSync(heatmapPath, JSON.stringify({ grid: GRID, points: heatmap.points }));
-  writeFileSync(streetsPath, JSON.stringify(streetsRes.streets));
-  writeFileSync(metaPath, JSON.stringify({
+  const { catalog, descToKey } = buildCatalog(agg.violationTotals);
+  console.log(`[catalog] top-${TOP_N_VIOLATIONS}+other:`, catalog.map(c => `${c.key}=${c.count}`).join(', '));
+
+  const streetIndex = buildStreetIndex(agg.streetTotals, descToKey);
+  const streetsGeoJSON = buildStreetsGeoJSON(streetFc, streetIndex, descToKey);
+  const timeJson = buildTimeJson(agg.hourByDay, agg.monthly, agg.hourByDayAll, agg.monthlyAll, descToKey);
+
+  // Strip rawDesc from catalog before writing meta (internal mapping only).
+  const publicCatalog = catalog.map(({ rawDesc, ...rest }) => rest);
+
+  const meta = {
     generatedAt: startedAt,
     since: SINCE,
-    rowCount: heatmap.total,
-    geolocatedRowCount: heatmap.kept,
-    streetCount: streetsRes.streetCount,
+    rowCount: ticketRows.length,
+    keptRowCount: agg.kept,
+    withTimeRowCount: agg.withTime,
+    streetCount: Object.keys(streetIndex.streets).length,
     rawId: RAW_ID,
-    streetId: STREET_ID,
+    streetsId: STREETS_ID,
+    dateRange: agg.dateMin && agg.dateMax ? {
+      from: agg.dateMin.toISOString().slice(0, 10),
+      to:   agg.dateMax.toISOString().slice(0, 10),
+    } : null,
+    violationCatalog: publicCatalog,
     sample: false,
-  }, null, 2));
+  };
 
-  const sizes = [heatmapPath, streetsPath, metaPath].map(p => {
+  const streetsGeoPath = resolve(OUT_DIR, 'streets.geojson');
+  const streetsPath    = resolve(OUT_DIR, 'streets.json');
+  const timePath       = resolve(OUT_DIR, 'time.json');
+  const metaPath       = resolve(OUT_DIR, 'meta.json');
+  const obsoleteHeatmap = resolve(OUT_DIR, 'heatmap.json');
+
+  writeFileSync(streetsGeoPath, JSON.stringify(streetsGeoJSON));
+  writeFileSync(streetsPath,    JSON.stringify(streetIndex.streets));
+  writeFileSync(timePath,       JSON.stringify(timeJson));
+  writeFileSync(metaPath,       JSON.stringify(meta, null, 2));
+  if (existsSync(obsoleteHeatmap)) unlinkSync(obsoleteHeatmap);
+
+  const paths = [streetsGeoPath, streetsPath, timePath, metaPath];
+  let totalBytes = 0;
+  console.log('\nWrote:');
+  for (const p of paths) {
     const s = statSync(p).size;
-    return `${p.split('/').slice(-2).join('/')}: ${(s / 1024).toFixed(1)} KB`;
-  });
-  console.log('\nWrote:\n  ' + sizes.join('\n  '));
-
-  const totalBytes = [heatmapPath, streetsPath, metaPath]
-    .reduce((sum, p) => sum + statSync(p).size, 0);
-  if (totalBytes > 4 * 1024 * 1024) {
-    console.error(`\nERROR: artifacts total ${(totalBytes / 1024 / 1024).toFixed(2)} MB (>4MB cap).`);
-    console.error('Raise --grid or shorten --since to reduce.');
+    totalBytes += s;
+    console.log(`  ${p.split('/').slice(-2).join('/')}: ${(s / 1024).toFixed(1)} KB`);
+  }
+  console.log(`  TOTAL: ${(totalBytes / 1024 / 1024).toFixed(2)} MB`);
+  if (totalBytes > BUDGET_BYTES) {
+    console.error(`\nERROR: artifacts total ${(totalBytes / 1024 / 1024).toFixed(2)} MB (>${BUDGET_BYTES / 1024 / 1024} MB cap).`);
+    console.error('Raise --simplify-tol or shorten --since to reduce.');
     process.exit(1);
   }
 })().catch(err => {
