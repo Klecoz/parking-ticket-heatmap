@@ -1,7 +1,6 @@
 # Buffalo parking-heatmap data build
 
-The `/parking-heatmap/` page is driven by three static JSON files in
-`/parking-heatmap/data/`:
+The page is driven by three static JSON files in `data/`:
 
 - `heatmap.json`  — weighted `[lat, lng, count]` triples binned to a ~30 m grid
 - `streets.json`  — per-street totals, top violations, and citywide rank
@@ -17,20 +16,20 @@ Requires Node 20+ (uses global `fetch`). No `npm install` needed.
 
 ```bash
 # from repo root
-node parking-heatmap/scripts/build-data.mjs
+node scripts/build-data.mjs
 ```
 
 Common overrides:
 
 ```bash
 # pull a different date window
-node parking-heatmap/scripts/build-data.mjs --since 2022-01-01
+node scripts/build-data.mjs --since 2022-01-01
 
 # coarser heatmap bins (faster, smaller file)
-node parking-heatmap/scripts/build-data.mjs --grid 0.0012
+node scripts/build-data.mjs --grid 0.0012
 
 # override the Socrata dataset 4x4 IDs
-node parking-heatmap/scripts/build-data.mjs \
+node scripts/build-data.mjs \
   --raw-id yvvn-sykd \
   --street-id es5y-a4h6
 ```
@@ -38,7 +37,7 @@ node parking-heatmap/scripts/build-data.mjs \
 If you have a Socrata app token to avoid throttling:
 
 ```bash
-SOCRATA_APP_TOKEN=xxxxxxxx node parking-heatmap/scripts/build-data.mjs
+SOCRATA_APP_TOKEN=xxxxxxxx node scripts/build-data.mjs
 ```
 
 ## Data sources
@@ -95,6 +94,6 @@ The generated JSON is tracked in git — that's the whole point. After
 running the script, commit the updated files:
 
 ```bash
-git add parking-heatmap/data/*.json
+git add data/*.json
 git commit -m "Refresh Buffalo parking-heatmap data"
 ```

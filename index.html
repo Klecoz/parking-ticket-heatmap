@@ -1,397 +1,181 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Arsenio Colon - Software Engineer</title>
-  <meta name="description" content="Arsenio Colon is a Software Engineer based in Buffalo, NY with experience in .NET, Azure, Unity, and AR/VR development." />
-  <meta property="og:title" content="Arsenio Colon - Software Engineer" />
-  <meta property="og:description" content="Software Engineer based in Buffalo, NY. Specializing in .NET, Azure, Unity, and AR/VR." />
-  <meta property="og:type" content="website" />
-  <meta property="og:url" content="https://arseniocolon.com" />
-  <meta property="og:image" content="https://arseniocolon.com/pic/headshot.PNG" />
-  <meta name="twitter:card" content="summary" />
-  <meta name="twitter:title" content="Arsenio Colon - Software Engineer" />
-  <meta name="twitter:description" content="Software Engineer based in Buffalo, NY. Specializing in .NET, Azure, Unity, and AR/VR." />
-  <meta name="twitter:image" content="https://arseniocolon.com/pic/headshot.PNG" />
-  <meta name="theme-color" content="#1a6b4a" />
-  <link rel="icon" type="image/svg+xml" href="pic/logo.svg" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css" />
-</head>
-<body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Buffalo Parking Ticket Heatmap</title>
+    <meta
+      name="description"
+      content="A heatmap of Buffalo, NY parking summonses and a 'where not to park' street lookup, built from City of Buffalo Open Data."
+    />
+    <meta property="og:title" content="Buffalo Parking Ticket Heatmap" />
+    <meta
+      property="og:description"
+      content="Where Buffalo tickets you. A heatmap + street lookup built from City of Buffalo Open Data."
+    />
+    <meta property="og:type" content="website" />
+    <meta name="theme-color" content="#1a6b4a" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%85%BF%EF%B8%8F%3C/text%3E%3C/svg%3E"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <!-- HERO -->
+    <section id="hero-app">
+      <p class="section-label">Data viz · Buffalo Open Data</p>
+      <h1>Where Buffalo<br /><span>tickets you.</span></h1>
+      <p class="lede">
+        A heatmap of parking summonses issued across Buffalo, NY, plus a
+        street-by-street lookup so you know <em>where not to park</em>. Built
+        from the City of Buffalo's open data portal.
+      </p>
+      <p class="data-currency" id="dataCurrency">Loading data…</p>
+    </section>
 
-  <!-- NAV -->
-  <nav>
-    <div class="nav-inner">
-      <a class="nav-logo" href="#" onclick="closeMobileNav()">Arsenio Colon</a>
-      <ul class="nav-links">
-        <li><a href="#experience">Experience</a></li>
-        <li><a href="#education">Education</a></li>
-        <li><a href="#projects">Projects</a></li>
-        <li><a href="#games">Games</a></li>
-        <li><a href="#contact">Contact</a></li>
-      </ul>
-      <button class="nav-toggle" aria-label="Toggle menu" aria-expanded="false">
-        <span></span>
-        <span></span>
-        <span></span>
-      </button>
-    </div>
-    <div class="mobile-nav" id="mobileNav">
-      <a href="#experience" onclick="closeMobileNav()">Experience</a>
-      <a href="#education" onclick="closeMobileNav()">Education</a>
-      <a href="#projects" onclick="closeMobileNav()">Projects</a>
-      <a href="#games" onclick="closeMobileNav()">Games</a>
-      <a href="#contact" onclick="closeMobileNav()">Contact</a>
-    </div>
-  </nav>
+    <!-- MAP -->
+    <section id="map-section">
+      <div
+        id="map"
+        role="region"
+        aria-label="Heatmap of Buffalo parking summonses"
+      ></div>
+      <div class="map-legend" aria-hidden="true">
+        <span class="legend-label">Fewer tickets</span>
+        <span class="legend-bar"></span>
+        <span class="legend-label">More tickets</span>
+      </div>
+    </section>
 
-  <!-- HERO -->
-  <section id="hero">
-    <div class="hero-intro">
-      <picture>
-        <source srcset="pic/headshot.webp" type="image/webp" />
-        <img class="hero-photo" src="pic/headshot.PNG" alt="Arsenio Colon" width="72" height="72" decoding="async" fetchpriority="high" />
-      </picture>
-      <p class="hero-eyebrow" style="margin-bottom:0;">Software Engineer · Buffalo, NY</p>
-    </div>
-    <h1>Hi, I'm Arsenio.<br><span>I build things.</span></h1>
-      <div class="hero-bio">
-        <p>
-          Software Engineer with experience building backend systems, cloud services, and AR/VR applications.
-          I've worked across fintech, higher ed, and defense, shipping .NET microservices at ACV Auctions,
-          maintaining enterprise platforms at M&T Bank, and building AR/VR training tools for the U.S. Navy at RED-INC.
+    <!-- LOOKUP -->
+    <section id="lookup">
+      <p class="section-label">Lookup</p>
+      <h2>Where not to park</h2>
+      <p class="section-desc">
+        Start typing a Buffalo street name. We'll show you how many parking
+        summonses have been issued there, what they're usually for, and how it
+        ranks against every other street in the city.
+      </p>
+
+      <div class="search-wrap">
+        <input
+          type="text"
+          id="streetSearch"
+          autocomplete="off"
+          spellcheck="false"
+          placeholder="Type a street name… (try &ldquo;Elmwood&rdquo;)"
+          aria-label="Street name"
+          aria-controls="suggestions"
+          aria-autocomplete="list"
+        />
+        <ul id="suggestions" role="listbox" aria-label="Matching streets"></ul>
+      </div>
+
+      <div id="statsCard" class="stats-card empty">
+        <p class="stats-empty">
+          Search a street above to see its parking-summons stats.
         </p>
-        <p>
-          Outside of work, I have a deep love for games and interactive experiences. I've built Unity prototypes
-          for game jams, earned 2nd place in ACV's internal Hackathon with a VR tower-defense concept on Meta Quest 2,
-          and previously served as Secretary on the Board of
-          <a href="https://buffalogamespace.com" target="_blank" rel="noopener noreferrer" style="color:var(--accent);text-decoration:none;">Buffalo Game Space</a>,
-          a 501(c)(3) supporting local game developers and digital artists.
-        </p>
       </div>
-      <div class="skills-strip">
-        <span class="skill-pill">C#</span>
-        <span class="skill-pill">.NET / ASP.NET</span>
-        <span class="skill-pill">Azure</span>
-        <span class="skill-pill">SQL</span>
-        <span class="skill-pill">Unity</span>
-        <span class="skill-pill">AR / VR</span>
-        <span class="skill-pill">Kubernetes</span>
-        <span class="skill-pill">JavaScript</span>
-        <span class="skill-pill">Git</span>
-        <span class="skill-pill">Datadog</span>
-      </div>
-      <div class="hero-cta">
-        <a href="#experience" class="btn btn-primary">Work Experience ↓</a>
-        <a href="#projects" class="btn btn-ghost">Projects ↓</a>
-        <a href="https://www.linkedin.com/in/arsenio-colon/" target="_blank" rel="noopener noreferrer" class="btn btn-ghost">LinkedIn</a>
-      </div>
-  </section>
 
-  <hr class="divider" />
+      <details class="leaderboard">
+        <summary>Top 20 worst streets to park on</summary>
+        <ol id="leaderboardList" class="leaderboard-list"></ol>
+      </details>
+    </section>
 
-  <!-- EXPERIENCE -->
-  <section id="experience">
-    <p class="section-label">Career</p>
-    <h2>Work Experience</h2>
-    <p class="section-desc">A timeline of my professional roles and what I worked on.</p>
-
-    <div class="timeline">
-
-      <div class="timeline-item">
-        <div class="timeline-date">May 2024 – Dec 2024<span>Acara Solutions</span></div>
-        <div class="timeline-body">
-          <h4>Technical Engineer III — Contractor</h4>
-          <div class="company">Acara Solutions · Buffalo, NY</div>
-          <ul>
-            <li>Developed .NET-based automation integrated with Automic to scan for keyword files on Windows VMs and upload relationship manager data into Calypso, streamlining manual processes for the derivatives team at M&T Bank.</li>
-          </ul>
+    <!-- ABOUT -->
+    <section id="about-app">
+      <p class="section-label">About this app</p>
+      <h2>How it works</h2>
+      <div class="about-grid">
+        <div>
+          <h4>Source</h4>
+          <p>
+            Data is pulled from the
+            <a
+              href="https://data.buffalony.gov/Transportation/Parking-Summonses/yvvn-sykd"
+              target="_blank"
+              rel="noopener noreferrer"
+              >Parking Summonses</a
+            >
+            dataset on Buffalo's Open Data portal. Pre-aggregated as static JSON
+            committed to this site — no API calls at runtime.
+          </p>
+        </div>
+        <div>
+          <h4>Heatmap</h4>
+          <p>
+            Each ticket with a geocoded location is binned to a ~30 m grid and
+            rendered as a weighted heat layer over CartoDB tiles. Lighter areas
+            mean fewer summonses, darker green means more.
+          </p>
+        </div>
+        <div>
+          <h4>Lookup</h4>
+          <p>
+            Street names are normalized (e.g. "ELMWOOD AVENUE" → "ELMWOOD AVE")
+            so search matches consistently. The stats card shows total tickets,
+            top three violation types, and a citywide rank.
+          </p>
+        </div>
+        <div>
+          <h4>Stack</h4>
+          <p>
+            Static HTML/CSS/vanilla JS. Map rendered with
+            <a
+              href="https://leafletjs.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              >Leaflet</a
+            >
+            and
+            <a
+              href="https://github.com/Leaflet/Leaflet.heat"
+              target="_blank"
+              rel="noopener noreferrer"
+              >Leaflet.heat</a
+            >. Build script is a single Node 20+ file with no dependencies.
+          </p>
         </div>
       </div>
+      <p class="disclaimer">
+        Not affiliated with the City of Buffalo. Aggregated from publicly
+        available data; counts reflect issued summonses and not necessarily
+        upheld violations.
+      </p>
+    </section>
 
-      <div class="timeline-item">
-        <div class="timeline-date">Nov 2022 – May 2024<span>ACV Auctions</span></div>
-        <div class="timeline-body">
-          <h4>Software Engineer L2</h4>
-          <div class="company">ACV Auctions · Buffalo, NY</div>
-          <ul>
-            <li>Contributed to .NET-based Payment and Order microservices supporting ~2,000 daily transactions.</li>
-            <li>Migrated alerting and monitoring from NewRelic to Datadog, enhancing observability and reducing alert noise.</li>
-            <li>Responded to on-call incidents and monitored system health to ensure application stability.</li>
-            <li>Earned 2nd place in ACV's internal Hackathon for a Unity-based VR prototype using Meta Quest 2 hand tracking and passthrough.</li>
-          </ul>
-        </div>
-      </div>
+    <button id="back-to-top" aria-label="Back to top">↑</button>
 
-      <div class="timeline-item">
-        <div class="timeline-date">Jan 2021 – Nov 2022<span>M&T Bank</span></div>
-        <div class="timeline-body">
-          <h4>Software Engineer I</h4>
-          <div class="company">M&T Bank · Buffalo, NY</div>
-          <ul>
-            <li>Contributed to internal Windows and web applications using C#, MS-SQL, and Angular with a .NET Core Code First approach.</li>
-            <li>Selected for M&T's "EquityOne" sponsorship program recognizing high-potential internal leaders.</li>
-            <li>Volunteered for Cybersecurity Champions and Touchdown for Teachers programs, presenting Tech Talks and mentoring through internal Tech Academy workshops.</li>
-          </ul>
-        </div>
-      </div>
+    <footer>
+      <p>
+        Built with City of Buffalo Open Data · &copy;
+        <span id="footer-year"></span>
+      </p>
+    </footer>
 
-      <div class="timeline-item">
-        <div class="timeline-date">Sep 2019 – Feb 2020<span>RED-INC</span></div>
-        <div class="timeline-body">
-          <h4>Software Developer</h4>
-          <div class="company">Research and Engineering Development, LLC · Buffalo, NY</div>
-          <ul>
-            <li>Developed AR/VR training modules for the U.S. Navy using Unity, C#, and XR Toolkit on Microsoft HoloLens and HTC Vive.</li>
-            <li>Coordinated with cross-disciplinary teams using Agile and Atlassian tools to align development goals and timelines.</li>
-          </ul>
-        </div>
-      </div>
-
-      <div class="timeline-item">
-        <div class="timeline-date">Feb 2018 – Sep 2019<span>Campus Labs</span></div>
-        <div class="timeline-body">
-          <h4>Software Developer</h4>
-          <div class="company">Campus Labs · Buffalo, NY</div>
-          <ul>
-            <li>Developed and deployed backend services using C# and Azure cloud pipelines via Azure DevOps for high-traffic education platforms.</li>
-            <li>Maintained the "Baseline" assessment platform built in ASP.NET, supporting over 1,400 public and private institutions.</li>
-          </ul>
-        </div>
-      </div>
-
-    </div>
-  </section>
-
-  <hr class="divider" />
-
-  <!-- EDUCATION -->
-  <section id="education">
-    <p class="section-label">Academic</p>
-    <h2>Education</h2>
-    <p class="section-desc">My academic background and relevant coursework.</p>
-
-    <div class="timeline">
-
-      <div class="edu-item">
-        <div class="edu-date">Aug 2015 – Dec 2017<span>SUNY Buffalo State</span></div>
-        <div class="edu-body">
-          <h4>Bachelor of Science, Computer Information Systems</h4>
-          <div class="school">State University of New York College at Buffalo · Buffalo, NY</div>
-          <p>Coursework: Computer Information Processing I &amp; II, Computer Organization, System Analysis,
-          Microcomputer Applications, E-Commerce Systems &amp; Technology, Visual Basic Programming,
-          Operating Systems, Database Processing, Programming for the Internet Environment I &amp; II,
-          Data Communication</p>
-        </div>
-      </div>
-
-    </div>
-  </section>
-
-  <hr class="divider" />
-
-  <!-- PROJECTS -->
-  <section id="projects">
-    <p class="section-label">Work</p>
-    <h2>Projects</h2>
-    <p class="section-desc">A selection of client and personal projects I've built or contributed to.</p>
-
-    <div class="project-grid">
-
-      <div class="project-card">
-        <a href="parking-heatmap/" style="text-decoration:none;color:inherit;display:flex;flex-direction:column;height:100%;">
-          <div class="project-card-img" style="display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#1a6b4a 0%,#0a3d29 100%);color:#fff;font-family:'Inter',sans-serif;font-weight:700;letter-spacing:0.02em;text-align:center;padding:1rem;">
-            <span style="font-size:1.15rem;line-height:1.3;">Buffalo Parking<br>Ticket Heatmap</span>
-          </div>
-          <div class="project-card-body">
-            <span class="project-tag">Data viz</span>
-            <h3>Buffalo Parking Ticket Heatmap</h3>
-            <p>A heatmap of parking summonses across Buffalo, NY plus a "where not to park" street-name lookup. Built from the City of Buffalo's Open Data portal as static JSON, rendered with Leaflet.</p>
-            <div class="project-links">
-              <span class="project-link">Open app ↗</span>
-            </div>
-          </div>
-        </a>
-      </div>
-
-      <div class="project-card">
-        <img class="project-card-img" src="pic/sightline.png" alt="Sightline" loading="lazy" decoding="async" />
-        <div class="project-card-body">
-          <span class="project-tag">Client</span>
-          <h3>Sightline</h3>
-          <p>Portfolio website built with Squarespace for a full-service art consulting firm that helps clients find exceptional artwork for residences and businesses.</p>
-          <div class="project-links">
-            <a href="http://www.sightline.biz" target="_blank" rel="noopener noreferrer" class="project-link">Visit site ↗</a>
-          </div>
-        </div>
-      </div>
-
-      <div class="project-card">
-        <img class="project-card-img" src="pic/schultz.png" alt="Schultz Optical" loading="lazy" decoding="async" />
-        <div class="project-card-body">
-          <span class="project-tag">Client</span>
-          <h3>Schultz Optical</h3>
-          <p>Website built with Joomla for storefront locations in Boston, NY and Walden, NY. Also redesigned their logo.</p>
-          <div class="project-links">
-            <span class="project-link" style="color:var(--muted);cursor:default;">Site no longer active</span>
-          </div>
-        </div>
-      </div>
-
-    </div>
-  </section>
-
-  <hr class="divider" />
-
-  <!-- GAMES -->
-  <section id="games">
-    <p class="section-label">Unity</p>
-    <h2>Games I've Made</h2>
-    <p class="section-desc">Games built in Unity for game jams, hackathons, and fun.</p>
-
-    <h3 class="subsection">VR &amp; AR</h3>
-    <div class="project-grid">
-
-      <div class="project-card">
-        <picture>
-          <source srcset="pic/make-game-on-real-table.webp" type="image/webp" />
-          <img class="project-card-img" src="pic/make-game-on-real-table.png" alt="Make Game On Real Table" loading="lazy" decoding="async" />
-        </picture>
-        <div class="project-card-body">
-          <span class="project-tag vr">VR · Hackathon · 2nd Place</span>
-          <h3>Make Game On Real Table</h3>
-          <p>A VR tower defense game played on your real desk using Meta Quest 2 hand tracking and passthrough. Use hand gestures to place towers and defend against waves of trebuchets. Made with Joey Napoli for the ACV Auctions Spring Hackathon 2023.</p>
-          <div class="project-links">
-            <a href="https://klecoz.itch.io/make-game-on-real-table" target="_blank" rel="noopener noreferrer" class="project-link">Itch.io ↗</a>
-          </div>
-        </div>
-      </div>
-
-      <div class="project-card">
-        <img class="project-card-img" src="pic/office-mistakes.png" alt="Office Mistakes" loading="lazy" decoding="async" />
-        <div class="project-card-body">
-          <span class="project-tag vr">VR · BGSjam XV</span>
-          <h3>Office Mistakes</h3>
-          <p>You're in an office and objects are talking to you. Don't make the mistake of going into the wrong door or you'll get lava'd. Built for Oculus Quest.</p>
-          <div class="project-links">
-            <a href="https://klecoz.itch.io/office-mistakes" target="_blank" rel="noopener noreferrer" class="project-link">Itch.io ↗</a>
-          </div>
-        </div>
-      </div>
-
-      <div class="project-card">
-        <img class="project-card-img" src="pic/repair-the-shape.png" alt="Repair the Shape" loading="lazy" decoding="async" />
-        <div class="project-card-body">
-          <span class="project-tag vr">VR · Global Game Jam 2020</span>
-          <h3>Repair the Shape</h3>
-          <p>Use your hands to repair the shape. Built for Oculus Quest for Global Game Jam 2020.</p>
-          <div class="project-links">
-            <a href="https://klecoz.itch.io/repair-the-shape" target="_blank" rel="noopener noreferrer" class="project-link">Itch.io ↗</a>
-            <a href="https://github.com/Klecoz/Global-Game-Jam-2020" target="_blank" rel="noopener noreferrer" class="project-link">GitHub ↗</a>
-          </div>
-        </div>
-      </div>
-
-    </div>
-
-    <h3 class="subsection" style="margin-top:3rem;">Other Games</h3>
-    <div class="project-grid">
-
-      <div class="project-card">
-        <img class="project-card-img" src="pic/trance-mission.png" alt="Trance Mission" loading="lazy" decoding="async" />
-        <div class="project-card-body">
-          <span class="project-tag game">Jam</span>
-          <h3>Trance Mission</h3>
-          <p>You're on a mission and you also like trance. Beat DJTranceEggs and get to the end!</p>
-          <div class="project-links">
-            <a href="https://klecoz.itch.io/trance-mission" target="_blank" rel="noopener noreferrer" class="project-link">Itch.io ↗</a>
-          </div>
-        </div>
-      </div>
-
-      <div class="project-card">
-        <img class="project-card-img" src="pic/birdthesquirrel.png" alt="Bird the Squirrel" loading="lazy" decoding="async" />
-        <div class="project-card-body">
-          <span class="project-tag game">Platformer</span>
-          <h3>Bird the Squirrel</h3>
-          <p>Stock up on acorns and evade an incoming cloud of CO2. Made for the Queen City High School Game Jam sponsored by AT&T.</p>
-          <div class="project-links">
-            <a href="https://www.wgrz.com/article/news/education/high-school-students-develop-video-games-at-buffalo-stem-event/71-d052e91e-0184-40a8-9695-23b4a66e1b41" target="_blank" rel="noopener noreferrer" class="project-link">Press ↗</a>
-          </div>
-        </div>
-      </div>
-
-      <div class="project-card">
-        <img class="project-card-img" src="pic/saimonsays.png" alt="SAIMON SAYS" loading="lazy" decoding="async" />
-        <div class="project-card-body">
-          <span class="project-tag game">Arcade</span>
-          <h3>SAIMON SAYS</h3>
-          <p>You're piloting a starship when an evil AI hijacks the controls and makes you press buttons, but keeps changing them. Don't let the gauge run down!</p>
-          <div class="project-links">
-            <a href="https://tigershark8980.itch.io/saimon-says" target="_blank" rel="noopener noreferrer" class="project-link">Itch.io ↗</a>
-          </div>
-        </div>
-      </div>
-
-      <div class="project-card">
-        <img class="project-card-img" src="pic/oscilloscoped.png" alt="Oscilloscope'd" loading="lazy" decoding="async" />
-        <div class="project-card-body">
-          <span class="project-tag game">Global Game Jam 2017</span>
-          <h3>Oscilloscope'd</h3>
-          <p>Made for Global Game Jam 2017 and used as part of a Senior Seminar capstone at Buffalo State College. Presented at three regional conferences.</p>
-          <div class="project-links">
-            <a href="https://klecoz.itch.io/oscilloscoped" target="_blank" rel="noopener noreferrer" class="project-link">Itch.io ↗</a>
-          </div>
-        </div>
-      </div>
-
-      <div class="project-card">
-        <img class="project-card-img" src="pic/crowbar.png" alt="Crowbar Puncher 9000" loading="lazy" decoding="async" />
-        <div class="project-card-body">
-          <span class="project-tag game">Jam</span>
-          <h3>Crowbar Puncher 9000</h3>
-          <p>One of my first Unity games. Made for QaziJam 8.</p>
-          <div class="project-links">
-            <a href="https://klecoz.itch.io/crowbar-puncher-9000" target="_blank" rel="noopener noreferrer" class="project-link">Itch.io ↗</a>
-          </div>
-        </div>
-      </div>
-
-    </div>
-  </section>
-
-  <hr class="divider" />
-
-  <!-- CONTACT -->
-  <section id="contact">
-    <p class="section-label">Get in touch</p>
-    <h2>Contact</h2>
-    <p class="section-desc">Feel free to reach out — I'm always open to new opportunities and conversations.</p>
-    <div class="contact-grid">
-      <a href="https://www.linkedin.com/in/arsenio-colon/" target="_blank" rel="noopener noreferrer" class="contact-card">
-        <span class="contact-card-label">LinkedIn</span>
-        <span class="contact-card-value">/in/arsenio-colon</span>
-      </a>
-      <a href="https://github.com/arseniocolon" target="_blank" rel="noopener noreferrer" class="contact-card">
-        <span class="contact-card-label">GitHub</span>
-        <span class="contact-card-value">github.com/arseniocolon</span>
-      </a>
-    </div>
-  </section>
-
-  <!-- BACK TO TOP -->
-  <button id="back-to-top" aria-label="Back to top">↑</button>
-
-  <!-- FOOTER -->
-  <footer>
-    <p>Arsenio Colon · Software Engineer · Buffalo, NY · &copy; <span id="footer-year"></span></p>
-  </footer>
-
-  <script src="js/main.js"></script>
-
-</body>
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
+    <script
+      src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"
+      crossorigin=""
+    ></script>
+    <script src="js/app.js" defer></script>
+  </body>
 </html>

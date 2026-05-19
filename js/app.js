@@ -1,15 +1,7 @@
 (() => {
   const $ = (id) => document.getElementById(id);
 
-  // Footer year + nav toggle (replicated from /js/main.js so this page is self-contained).
   $('footer-year').textContent = new Date().getFullYear();
-  const toggle = document.querySelector('.nav-toggle');
-  const mobileNav = $('mobileNav');
-  toggle.addEventListener('click', () => {
-    const open = mobileNav.classList.toggle('open');
-    toggle.classList.toggle('open', open);
-    toggle.setAttribute('aria-expanded', open);
-  });
   const backToTop = $('back-to-top');
   window.addEventListener('scroll', () => {
     backToTop.classList.toggle('visible', window.scrollY > 400);
