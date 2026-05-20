@@ -55,7 +55,8 @@ import { fmt } from "./util.js";
     () => null,
   );
   neighborhoods = neighborhoodsData?.neighborhoods ?? neighborhoodsData ?? [];
-  const streetNeighborhood = neighborhoodsData?.streetNeighborhood ?? {};
+  const streetNeighborhoodMap = neighborhoodsData?.streetNeighborhood ?? {};
+  void streetNeighborhoodMap; // used in commit 3 wiring
 
   // Must be called before any component reads from timeIndex.
   initTimeIndex({ streetsTime, streets });

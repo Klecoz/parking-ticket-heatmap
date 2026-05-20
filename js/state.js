@@ -14,6 +14,7 @@ const state = {
   play: false, // boolean — animated timelapse playing
   pin: null, // null | { lat, lng } — "park here" pin
   layers: new Set(), // active overlay layer keys: 'neighborhoods', 'meter', 'permit', 'venues'
+  neighborhood: null, // null | neighborhood key — drill-down filter
 };
 
 let monthsRef = []; // injected via configureState({ months }) at boot
@@ -48,6 +49,9 @@ export function getPin() {
 }
 export function getLayers() {
   return state.layers;
+}
+export function getNeighborhood() {
+  return state.neighborhood;
 }
 export function getState() {
   return state;
@@ -105,6 +109,17 @@ export function setPin(pin) {
   if (pinEquals(state.pin, pin)) return;
   state.pin = pin ? { lat: pin.lat, lng: pin.lng } : null;
   notify();
+}
+
+export function setNeighborhood(key) {
+  const next = key || null;
+  if (state.neighborhood === next) return;
+  state.neighborhood = next;
+  notify();
+}
+
+export function clearNeighborhood() {
+  setNeighborhood(null);
 }
 
 function rangeEquals(a, b) {
@@ -172,6 +187,7 @@ function writeHash() {
     // same state would otherwise serialize differently depending on toggle order.
     params.set("layers", [...state.layers].sort().join(","));
   }
+  if (state.neighborhood) params.set("nb", state.neighborhood);
   const next = params.toString();
   const url = next
     ? `#${next}`
@@ -233,6 +249,9 @@ export function hydrateFromHash() {
     );
   }
 
+  const nb = params.get("nb");
+  if (nb) state.neighborhood = nb;
+
   hashWriteSuspended = false;
 }
 
@@ -253,6 +272,7 @@ window.addEventListener("hashchange", () => {
   state.play = false;
   state.pin = null;
   state.layers = new Set();
+  state.neighborhood = null;
   hydrateFromHash();
   for (const fn of subs) {
     try {
