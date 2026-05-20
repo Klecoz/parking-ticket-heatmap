@@ -13,7 +13,7 @@
 //
 // Requires Node 20+ (uses global fetch). No npm install.
 
-import { writeFileSync, mkdirSync, statSync, unlinkSync, existsSync } from 'node:fs';
+import { writeFileSync, mkdirSync, statSync, unlinkSync, existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -438,8 +438,159 @@ function buildTimeJson(hourByDay, monthly, hourByDayAll, monthlyAll, hourByDayBy
   return { hourByDayByViolation, monthlyByViolation, hourByDayByMonth };
 }
 
+// Ray-casting point-in-polygon for a single GeoJSON Polygon ring (array of [lng,lat]).
+function pointInRing(px, py, ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i];
+    const [xj, yj] = ring[j];
+    if (((yi > py) !== (yj > py)) && (px < (xj - xi) * (py - yi) / (yj - yi) + xi)) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+// Returns true if point [lng, lat] is inside a GeoJSON Polygon or MultiPolygon geometry.
+function pointInPolygon(lng, lat, geometry) {
+  if (geometry.type === 'Polygon') {
+    return pointInRing(lng, lat, geometry.coordinates[0]);
+  }
+  if (geometry.type === 'MultiPolygon') {
+    return geometry.coordinates.some(poly => pointInRing(lng, lat, poly[0]));
+  }
+  return false;
+}
+
+// Mean of all coordinate pairs in a LineString or MultiLineString geometry.
+function segmentCentroid(geometry) {
+  let sumLng = 0, sumLat = 0, n = 0;
+  const addCoords = coords => { for (const [lng, lat] of coords) { sumLng += lng; sumLat += lat; n++; } };
+  if (geometry.type === 'LineString') addCoords(geometry.coordinates);
+  else if (geometry.type === 'MultiLineString') geometry.coordinates.forEach(addCoords);
+  return n > 0 ? [sumLng / n, sumLat / n] : null;
+}
+
+// Standalone: build data/neighborhoods.json and update data/neighborhoods.geojson.
+// Can be run against already-built streets.geojson + streets.json without re-fetching from Socrata.
+function buildNeighborhoodsData(streetsGeoJSON, streetIndex, catalog) {
+  const neighborhoodsGeoPath = resolve(OUT_DIR, 'neighborhoods.geojson');
+  if (!existsSync(neighborhoodsGeoPath)) {
+    console.warn('[neighborhoods] data/neighborhoods.geojson not found — skipping neighborhood build');
+    return;
+  }
+
+  const neighborhoodsFc = JSON.parse(readFileSync(neighborhoodsGeoPath, 'utf8'));
+  const neighborhoods = neighborhoodsFc.features.map(f => ({
+    key: f.properties.key,
+    name: f.properties.name,
+    geometry: f.geometry,
+    ticketCount: 0,
+    streetCount: 0,
+    topStreets: [],
+    byViolation: {},
+    _streetCounts: [],
+  }));
+
+  const violationKeys = catalog.map(c => c.key);
+
+  for (const seg of streetsGeoJSON.features) {
+    const { count, byViolation, name: streetName, display } = seg.properties;
+    const centroid = segmentCentroid(seg.geometry);
+    if (!centroid) continue;
+    const [lng, lat] = centroid;
+
+    for (const nbr of neighborhoods) {
+      if (!pointInPolygon(lng, lat, nbr.geometry)) continue;
+      nbr.ticketCount += count || 0;
+      if (count > 0) nbr.streetCount++;
+      if (count > 0) nbr._streetCounts.push({ name: display || streetName, count });
+      if (byViolation) {
+        for (const vk of violationKeys) {
+          if (byViolation[vk]) nbr.byViolation[vk] = (nbr.byViolation[vk] || 0) + byViolation[vk];
+        }
+      }
+      break; // each segment matches at most one neighborhood
+    }
+  }
+
+  // Build topStreets per neighborhood (top 5 segments by count, merging same display name).
+  const result = neighborhoods
+    .map(nbr => {
+      // Merge duplicate display names (multiple segments for same street).
+      const merged = new Map();
+      for (const { name, count } of nbr._streetCounts) {
+        merged.set(name, (merged.get(name) || 0) + count);
+      }
+      const topStreets = [...merged.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([name, count]) => ({ name, count }));
+
+      return {
+        key: nbr.key,
+        name: nbr.name,
+        ticketCount: nbr.ticketCount,
+        streetCount: nbr.streetCount,
+        topStreets,
+        byViolation: nbr.byViolation,
+      };
+    })
+    .sort((a, b) => b.ticketCount - a.ticketCount);
+
+  // Embed ticketCount into neighborhoods.geojson features.
+  const ticketByKey = new Map(result.map(r => [r.key, r.ticketCount]));
+  const augmentedFc = {
+    ...neighborhoodsFc,
+    features: neighborhoodsFc.features.map(f => ({
+      ...f,
+      properties: { ...f.properties, ticketCount: ticketByKey.get(f.properties.key) || 0 },
+    })),
+  };
+
+  const neighborhoodsJsonPath = resolve(OUT_DIR, 'neighborhoods.json');
+  writeFileSync(neighborhoodsJsonPath, JSON.stringify(result));
+  writeFileSync(neighborhoodsGeoPath, JSON.stringify(augmentedFc));
+  console.log(`[neighborhoods] wrote ${result.length} neighborhoods → neighborhoods.json`);
+  console.log('[neighborhoods] updated neighborhoods.geojson with ticketCount');
+}
+
+async function preflightSocrataSchema() {
+  // Validate that required field names exist in both datasets before the full pull.
+  // Tickets dataset: check for summdt, viotime, viodesc, violation_street
+  const ticketsFields = ['summdt', 'viotime', 'viodesc', 'violation_street'];
+  const ticketsUrl = `${RAW_ID}.json?$limit=1`;
+  const ticketsRows = await soda(ticketsUrl);
+  if (!ticketsRows || !Array.isArray(ticketsRows) || ticketsRows.length === 0) {
+    throw new Error(`Socrata schema drift on dataset ${RAW_ID}: cannot fetch sample row (empty result). Check RAW_ID.`);
+  }
+  const ticketsSample = ticketsRows[0];
+  const ticketsKeys = Object.keys(ticketsSample);
+  const ticketsMissing = ticketsFields.filter(f => !(f in ticketsSample));
+  if (ticketsMissing.length > 0) {
+    throw new Error(`Socrata schema drift on dataset ${RAW_ID}: expected fields [${ticketsFields.join(', ')}]. Got keys: [${ticketsKeys.join(', ')}]. Update RAW_ID/field names in build-data.mjs.`);
+  }
+
+  // Streets dataset: check for streetname, leftcitytownname, rightcitytownname, label
+  const streetsFields = ['streetname', 'leftcitytownname', 'rightcitytownname', 'label'];
+  const streetsUrl = `${STREETS_ID}.json?$limit=1`;
+  const streetsRows = await soda(streetsUrl);
+  if (!streetsRows || !Array.isArray(streetsRows) || streetsRows.length === 0) {
+    throw new Error(`Socrata schema drift on dataset ${STREETS_ID}: cannot fetch sample row (empty result). Check STREETS_ID.`);
+  }
+  const streetsSample = streetsRows[0];
+  const streetsKeys = Object.keys(streetsSample);
+  const streetsMissing = streetsFields.filter(f => !(f in streetsSample));
+  if (streetsMissing.length > 0) {
+    throw new Error(`Socrata schema drift on dataset ${STREETS_ID}: expected fields [${streetsFields.join(', ')}]. Got keys: [${streetsKeys.join(', ')}]. Update STREETS_ID/field names in build-data.mjs.`);
+  }
+
+  console.log('[preflight] schema OK');
+}
+
 (async () => {
   const startedAt = new Date().toISOString();
+  await preflightSocrataSchema();
   const [ticketRows, streetFc] = await Promise.all([
     fetchTickets(),
     fetchStreetsGeoJSON(),
@@ -478,6 +629,9 @@ function buildTimeJson(hourByDay, monthly, hourByDayAll, monthlyAll, hourByDayBy
     sample: false,
   };
 
+  // Spatial-join streets → neighborhoods (standalone: reads neighborhoods.geojson from repo).
+  buildNeighborhoodsData(streetsGeoJSON, streetIndex, catalog);
+
   const streetsGeoPath  = resolve(OUT_DIR, 'streets.geojson');
   const streetsPath     = resolve(OUT_DIR, 'streets.json');
   const timePath        = resolve(OUT_DIR, 'time.json');
@@ -492,7 +646,9 @@ function buildTimeJson(hourByDay, monthly, hourByDayAll, monthlyAll, hourByDayBy
   writeFileSync(streetsTimePath, JSON.stringify(streetsTime));
   if (existsSync(obsoleteHeatmap)) unlinkSync(obsoleteHeatmap);
 
-  const paths = [streetsGeoPath, streetsPath, timePath, metaPath, streetsTimePath];
+  const neighborhoodsJsonPath = resolve(OUT_DIR, 'neighborhoods.json');
+  const paths = [streetsGeoPath, streetsPath, timePath, metaPath, streetsTimePath,
+    ...(existsSync(neighborhoodsJsonPath) ? [neighborhoodsJsonPath] : [])];
   let totalBytes = 0;
   console.log('\nWrote:');
   for (const p of paths) {
