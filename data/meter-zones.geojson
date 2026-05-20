@@ -1,0 +1,71 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Downtown metered core",
+        "type": "meter",
+        "hours": "8am–6pm Mon–Sat",
+        "notes": "Approximate metered zone covering Main St corridor from Canalside to Allen St, between Pearl St and Washington St. Includes Chippewa entertainment district."
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-78.876, 42.887],
+          [-78.866, 42.885],
+          [-78.864, 42.877],
+          [-78.866, 42.870],
+          [-78.874, 42.867],
+          [-78.882, 42.868],
+          [-78.886, 42.875],
+          [-78.884, 42.884],
+          [-78.876, 42.887]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Allentown / Elmwood metered strip",
+        "type": "meter",
+        "hours": "8am–8pm Mon–Sat",
+        "notes": "Metered parking along Elmwood Ave commercial strip and Allen St. Longer enforcement hours due to restaurant/bar density."
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-78.882, 42.905],
+          [-78.876, 42.903],
+          [-78.874, 42.897],
+          [-78.876, 42.890],
+          [-78.882, 42.890],
+          [-78.884, 42.895],
+          [-78.884, 42.902],
+          [-78.882, 42.905]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Hertel Ave commercial metered zone",
+        "type": "meter",
+        "hours": "8am–6pm Mon–Sat",
+        "notes": "Metered parking along Hertel Ave between Delaware and Voorhees; serves the North Buffalo commercial strip."
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-78.896, 42.930],
+          [-78.878, 42.930],
+          [-78.876, 42.924],
+          [-78.878, 42.920],
+          [-78.896, 42.920],
+          [-78.898, 42.925],
+          [-78.896, 42.930]
+        ]]
+      }
+    }
+  ]
+}

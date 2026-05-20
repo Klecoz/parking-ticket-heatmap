@@ -1,0 +1,52 @@
+{
+  "venues": [
+    {
+      "key": "keybank",
+      "name": "KeyBank Center",
+      "lat": 42.8754,
+      "lng": -78.8763,
+      "address": "1 Seymour H Knox III Plaza, Buffalo, NY 14203",
+      "teams": ["Sabres"],
+      "typicalSeasonMonths": [10, 11, 12, 1, 2, 3, 4],
+      "capacity": 19070,
+      "notes": "Home of the Buffalo Sabres (NHL). Also hosts concerts, Bandits lacrosse, and large events. Located on the waterfront at Canalside — game nights heavily impact Erie, Scott, Pearl, and Washington St parking."
+    },
+    {
+      "key": "highmark",
+      "name": "Highmark Stadium",
+      "lat": 42.7738,
+      "lng": -78.7870,
+      "address": "1 Bills Dr, Orchard Park, NY 14127",
+      "note": "In Orchard Park, not Buffalo proper — events still create downtown parking demand and surface lot usage near Metro Rail stops.",
+      "teams": ["Bills"],
+      "typicalSeasonMonths": [9, 10, 11, 12, 1],
+      "capacity": 71608,
+      "notes": "Home of the Buffalo Bills (NFL). Orchard Park location but fan traffic affects Southtowns and park-and-ride lots. New stadium (Pegula Sports & Entertainment) under construction nearby as of 2024."
+    },
+    {
+      "key": "coca-cola-field",
+      "name": "Sahlen Field",
+      "lat": 42.8843,
+      "lng": -78.8724,
+      "address": "1 James D Griffin Plaza, Buffalo, NY 14203",
+      "note": "Downtown Buffalo ballpark — walkable from Main St corridor.",
+      "teams": ["Bisons"],
+      "typicalSeasonMonths": [4, 5, 6, 7, 8, 9],
+      "capacity": 16600,
+      "notes": "Home of the Buffalo Bisons (Triple-A, Blue Jays affiliate). Season April–September. Games increase evening parking demand on Washington, Oak, and Pearl St corridors."
+    },
+    {
+      "key": "ubnorth",
+      "name": "UB North Campus",
+      "lat": 43.0021,
+      "lng": -78.7890,
+      "address": "12 Capen Hall, Buffalo, NY 14260",
+      "note": "Amherst — outside city limits. Graduation ceremonies in May draw large crowds.",
+      "teams": ["UB Bulls"],
+      "typicalSeasonMonths": [9, 10, 11, 12, 1, 2, 3, 4, 5],
+      "capacity": null,
+      "notes": "University at Buffalo main campus. Football and basketball events create some traffic but primary impact is on Amherst/Cheektowaga, not Buffalo proper."
+    }
+  ],
+  "note": "Used to overlay Sabres/Bills/Bisons home season heatmap pinpoints. Specific game dates require external schedule data; this captures the recurring seasonal patterns. KeyBank Center and Sahlen Field are within Buffalo city limits and directly affect city parking enforcement."
+}

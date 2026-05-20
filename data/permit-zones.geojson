@@ -1,0 +1,74 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Allentown permit zone",
+        "key": "allentown-permit",
+        "type": "permit",
+        "rules": "Resident permit required 6pm–10am",
+        "notes": "Residential permit zone covering streets around Allen St, Franklin St, and lower Elmwood. Protects residents from spillover parking from bars and the arts district."
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-78.882, 42.897],
+          [-78.870, 42.897],
+          [-78.868, 42.891],
+          [-78.870, 42.886],
+          [-78.878, 42.884],
+          [-78.884, 42.886],
+          [-78.884, 42.892],
+          [-78.882, 42.897]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Elmwood Village permit zone",
+        "key": "elmwood-permit",
+        "type": "permit",
+        "rules": "Resident permit required 6pm–10am",
+        "notes": "Residential permit zone covering side streets off Elmwood Ave between Bryant St and W Ferry St. Protects residents from restaurant and bar parking overflow."
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-78.886, 42.910],
+          [-78.876, 42.910],
+          [-78.874, 42.904],
+          [-78.874, 42.898],
+          [-78.880, 42.897],
+          [-78.886, 42.898],
+          [-78.888, 42.904],
+          [-78.886, 42.910]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "UB South / University Heights permit zone",
+        "key": "ub-south-permit",
+        "type": "permit",
+        "rules": "Resident permit required 7am–5pm Mon–Fri",
+        "notes": "Residential permit zone around UB South Campus (Main St and Bailey Ave area). Protects residents from student and employee parking overflow during university hours."
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-78.844, 42.938],
+          [-78.822, 42.938],
+          [-78.818, 42.930],
+          [-78.820, 42.920],
+          [-78.832, 42.916],
+          [-78.844, 42.918],
+          [-78.848, 42.928],
+          [-78.844, 42.938]
+        ]]
+      }
+    }
+  ]
+}
