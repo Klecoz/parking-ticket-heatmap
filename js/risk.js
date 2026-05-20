@@ -35,6 +35,13 @@ export function mountRisk({ streets, streetsFc: fc, streetCount }) {
 
   subscribe(render);
   render();
+
+  // Populate the search input if a street was hydrated from the URL hash.
+  const initialStreet = getState().street;
+  if (initialStreet && allStreets[initialStreet]) {
+    const input = document.getElementById("riskStreet");
+    if (input) input.value = titleCase(allStreets[initialStreet].display);
+  }
 }
 
 function bindSearch() {
@@ -254,7 +261,7 @@ function render() {
 
   const street = allStreets[norm];
   const rank = street.rank;
-  const percentile = ((rank / totalStreets) * 100).toFixed(1);
+  const percentile = Math.round(((totalStreets - rank) / totalStreets) * 100);
 
   readout.innerHTML = `
     <div class="risk-card">
@@ -263,7 +270,7 @@ function render() {
           <strong>${escapeHtml(titleCase(street.display))}</strong>
         </div>
         <div class="risk-rank-output">
-          Ranks <strong>#${fmt(rank)}</strong> of ${fmt(totalStreets)} (top ${percentile}%)
+          Ranks <strong>#${fmt(rank)}</strong> of ${fmt(totalStreets)} — ${percentile}th percentile
         </div>
         <div class="risk-detail-row muted">
           ${fmt(street.count)} total tickets

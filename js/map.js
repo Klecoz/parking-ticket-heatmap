@@ -127,7 +127,7 @@ function bindFeature(feature, layerObj) {
     const norm = props.name;
     const v = getStreetCount(norm, state);
     const html =
-      `<strong>${escapeHtml(props.display || props.name)}</strong>` +
+      `<strong>${escapeHtml(props.display || props.name)}</strong><br>` +
       `${fmt(v)} ${state.filter === "_all" ? "tickets" : "tickets (filtered)"} since 2024` +
       (props.rank ? `<br>citywide rank #${fmt(props.rank)}` : "");
     layerObj.bindPopup(html, { closeButton: true, autoPan: true }).openPopup();

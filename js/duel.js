@@ -46,8 +46,10 @@ export function mountDuel({ streets, catalog }) {
   // Hydrate inputs from current duel state (URL hash).
   const cur = getDuel();
   if (cur) {
-    const a = allStreets[cur.a];
-    const b = allStreets[cur.b];
+    const aNorm = allStreets[cur.a] ? cur.a : normalizeStreet(cur.a);
+    const bNorm = allStreets[cur.b] ? cur.b : normalizeStreet(cur.b);
+    const a = allStreets[aNorm];
+    const b = allStreets[bNorm];
     if (a) document.getElementById("duelSearchA").value = titleCase(a.display);
     if (b) document.getElementById("duelSearchB").value = titleCase(b.display);
   }

@@ -274,6 +274,7 @@ function renderNeighborhoods() {
     const total = nb.ticketCount || 1;
 
     for (const entry of catalogList) {
+      if (entry.key === "other") continue;
       const n = nb.byViolation?.[entry.key] || 0;
       if (n === 0) continue;
       const seg = document.createElement("div");

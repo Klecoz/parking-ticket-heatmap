@@ -123,6 +123,11 @@ a {
   color: var(--muted);
   font-weight: 400;
 }
+@media (max-width: 600px) {
+  .brand-title em {
+    display: none;
+  }
+}
 .header-meta {
   display: flex;
   align-items: center;
@@ -516,7 +521,7 @@ h3 {
   /* ── Sticky chip bar on mobile ── */
   [role="group"][aria-label="Filter by violation"] {
     position: sticky;
-    top: 0;
+    top: var(--header-h);
     z-index: 120;
     background: var(--surface);
     backdrop-filter: saturate(120%) blur(8px);
