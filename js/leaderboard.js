@@ -315,9 +315,9 @@ function renderNeighborhoods() {
       if (isActive) {
         clearNeighborhood();
       } else {
-        setNeighborhood(nb.key);
-        // Switch to streets tab to immediately show filtered results
+        // Switch tab first so the render() triggered by setNeighborhood sees the right activeTab
         activeTab = "streets";
+        setNeighborhood(nb.key);
       }
     };
     row.addEventListener("click", handleNbClick);
