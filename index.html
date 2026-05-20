@@ -51,6 +51,33 @@
         </div>
         <div class="header-meta">
           <span class="header-currency" id="headerCurrency">Loading…</span>
+          <button
+            type="button"
+            id="shareBtn"
+            class="share-btn"
+            aria-label="Copy share link"
+          >
+            <svg
+              viewBox="0 0 16 16"
+              aria-hidden="true"
+              fill="currentColor"
+              width="14"
+              height="14"
+            >
+              <path
+                d="M13.5 1a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM11 2.5a2.5 2.5 0 1 1 .603 1.628l-6.718 3.12a2.499 2.499 0 0 1 0 1.504l6.718 3.12a2.5 2.5 0 1 1-.488.876l-6.718-3.12a2.5 2.5 0 1 1 0-3.256l6.718-3.12A2.5 2.5 0 0 1 11 2.5zm-8.5 4a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm11 5.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z"
+              />
+            </svg>
+            Share
+          </button>
+          <input
+            type="text"
+            id="shareUrlInput"
+            aria-hidden="true"
+            tabindex="-1"
+            readonly
+            style="position: absolute; left: -9999px; width: 1px; height: 1px"
+          />
           <a
             class="header-link"
             href="https://github.com/Klecoz/parking-ticket-heatmap"
@@ -355,7 +382,15 @@
           >
         </div>
         <div id="lbBreadcrumb" class="nb-breadcrumb" hidden></div>
-        <ol id="leaderboardList" class="leaderboard-list"></ol>
+        <ol id="leaderboardList" class="leaderboard-list">
+          <li class="skeleton skeleton-lb-row" aria-hidden="true"></li>
+          <li class="skeleton skeleton-lb-row" aria-hidden="true"></li>
+          <li class="skeleton skeleton-lb-row" aria-hidden="true"></li>
+          <li class="skeleton skeleton-lb-row" aria-hidden="true"></li>
+          <li class="skeleton skeleton-lb-row" aria-hidden="true"></li>
+          <li class="skeleton skeleton-lb-row" aria-hidden="true"></li>
+          <li class="skeleton skeleton-lb-row" aria-hidden="true"></li>
+        </ol>
         <button id="leaderboardMore" class="leaderboard-more" type="button">
           Show next 80 &rarr;
         </button>

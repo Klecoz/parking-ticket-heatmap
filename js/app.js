@@ -9,6 +9,7 @@ import { highlightStreet, mountMap } from "./map.js";
 import { mountMeta } from "./meta.js";
 import { mountRange } from "./range.js";
 import { mountRisk } from "./risk.js";
+import { mountShare } from "./share.js";
 import {
   configureState,
   getStreet,
@@ -26,6 +27,7 @@ import { fmt } from "./util.js";
 
 (async () => {
   document.getElementById("footer-year").textContent = new Date().getFullYear();
+  mountShare();
 
   const backToTop = document.getElementById("back-to-top");
   window.addEventListener(
