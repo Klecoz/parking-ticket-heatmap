@@ -1,6 +1,7 @@
 // Head-to-head: pick two streets, render side-by-side cards with totals,
-// top violations, percentile, and a 24-hour mini heatstrip. State.duel
-// persists the matchup to the URL hash so it's shareable.
+// rank/percentile, a per-street violation-type breakdown bar, and top
+// violations. State.duel persists the matchup to the URL hash so it's
+// shareable.
 
 import { getDuel, getFilter, getState, setDuel, subscribe } from "./state.js";
 import {
