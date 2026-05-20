@@ -1,8 +1,14 @@
 // Buffalo context overlays: neighborhoods, meter zones, permit zones, venues.
 // All overlays are off by default and toggle via state.layers (URL-syncable).
 
-import { getMap } from "./map.js";
-import { getLayers, subscribe, toggleLayer } from "./state.js";
+import { getMap, setNeighborhoodPolygons } from "./map.js";
+import {
+  getLayers,
+  getNeighborhood,
+  setNeighborhood,
+  subscribe,
+  toggleLayer,
+} from "./state.js";
 
 const LAYER_STYLES = {
   neighborhoods: {
@@ -55,6 +61,9 @@ export async function mountLayers() {
     console.warn("[layers] failed to load one or more overlays:", err);
   }
 
+  // Pass neighborhood polygons to map for fit-bounds on drill-down.
+  if (neighborhoodsFc) setNeighborhoodPolygons(neighborhoodsFc);
+
   subscribe(syncLayers);
   syncLayers();
 }
@@ -106,8 +115,53 @@ function syncLayers() {
   }
 }
 
+const NB_STYLE_DEFAULT = {
+  color: "#0b7ab1",
+  fillColor: "#0b7ab1",
+  fillOpacity: 0.06,
+  weight: 1.5,
+  dashArray: "4 3",
+};
+const NB_STYLE_ACTIVE = {
+  color: "#1a6b4a",
+  fillColor: "#1a6b4a",
+  fillOpacity: 0.18,
+  weight: 2.5,
+  dashArray: null,
+};
+
+function nbStyleFor(feature) {
+  const p = feature.properties || {};
+  const activeNb = getNeighborhood();
+  return activeNb && p.key === activeNb ? NB_STYLE_ACTIVE : NB_STYLE_DEFAULT;
+}
+
 function ensureLayerInstance(key, fc) {
   if (layerInstances[key] || !fc) return;
+
+  if (key === "neighborhoods") {
+    layerInstances[key] = L.geoJSON(fc, {
+      style: (f) => nbStyleFor(f),
+      renderer: L.svg(),
+      onEachFeature: (feature, lyr) => {
+        const p = feature.properties || {};
+        lyr.bindTooltip(`<strong>${escapeHtml(p.name || "")}</strong>`, {
+          sticky: true,
+        });
+        lyr.on("click", () => {
+          if (p.key) setNeighborhood(p.key);
+        });
+      },
+    });
+    // Re-style polygons when neighborhood state changes.
+    subscribe(() => {
+      if (layerInstances.neighborhoods) {
+        layerInstances.neighborhoods.setStyle((f) => nbStyleFor(f));
+      }
+    });
+    return;
+  }
+
   const style = LAYER_STYLES[key] || {
     color: "#666",
     fillOpacity: 0.05,

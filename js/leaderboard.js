@@ -1,6 +1,13 @@
 // Inline leaderboard with horizontal bars. Reacts to filter + range changes.
 
-import { getFilter, getRange, getState, subscribe } from "./state.js";
+import {
+  clearNeighborhood,
+  getFilter,
+  getRange,
+  getState,
+  setNeighborhood,
+  subscribe,
+} from "./state.js";
 import { getStreetCounts } from "./timeIndex.js";
 import { fmt, isJunkStreet, titleCase } from "./util.js";
 
@@ -101,7 +108,31 @@ function formatRangeLabel(range, months) {
   return `${fmt0(months[range.fromIdx])} – ${fmt0(months[range.toIdx])}`;
 }
 
+function renderBreadcrumb() {
+  const state = getState();
+  const nb = state.neighborhood;
+  const container = document.getElementById("lbBreadcrumb");
+  if (!container) return;
+  if (!nb) {
+    container.hidden = true;
+    container.innerHTML = "";
+    return;
+  }
+  const nbData = neighborhoodData.find((n) => n.key === nb);
+  const nbName = nbData ? nbData.name : nb;
+  container.hidden = false;
+  container.innerHTML =
+    `<span class="nb-breadcrumb-label">Viewing: <strong>${escapeHtml(nbName)}</strong></span>` +
+    `<button class="nb-breadcrumb-clear" type="button" aria-label="Clear neighborhood filter">× Clear</button>`;
+  container
+    .querySelector(".nb-breadcrumb-clear")
+    .addEventListener("click", () => {
+      clearNeighborhood();
+    });
+}
+
 function render() {
+  renderBreadcrumb();
   applyTabState();
   if (activeTab === "neighborhoods") {
     renderNeighborhoods();
@@ -203,11 +234,17 @@ function renderNeighborhoods() {
   container.appendChild(note);
 
   const max = neighborhoodData[0]?.ticketCount || 1;
+  const activeNb = getState().neighborhood;
 
   for (let i = 0; i < neighborhoodData.length; i++) {
     const nb = neighborhoodData[i];
+    const isActive = nb.key === activeNb;
     const row = document.createElement("div");
-    row.className = "lb-nb-row";
+    row.className = `lb-nb-row${isActive ? " lb-nb-active" : ""}`;
+    row.setAttribute("role", "button");
+    row.setAttribute("tabindex", "0");
+    row.setAttribute("aria-pressed", isActive ? "true" : "false");
+    row.style.cursor = "pointer";
 
     // Rank + name
     const meta = document.createElement("div");
@@ -271,6 +308,24 @@ function renderNeighborhoods() {
       "--nb-scale",
       String(Math.max(0.04, nb.ticketCount / max)),
     );
+
+    // Click to drill down (toggle off if already active)
+    const handleNbClick = () => {
+      if (isActive) {
+        clearNeighborhood();
+      } else {
+        setNeighborhood(nb.key);
+        // Switch to streets tab to immediately show filtered results
+        activeTab = "streets";
+      }
+    };
+    row.addEventListener("click", handleNbClick);
+    row.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        handleNbClick();
+      }
+    });
 
     container.appendChild(row);
   }

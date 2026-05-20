@@ -2,6 +2,7 @@
 
 import {
   getFilter,
+  getNeighborhood,
   getRange,
   getState,
   setStreet,
@@ -17,6 +18,7 @@ let metaMonths = []; // ["2024-01", ...] — threaded from app.js for range labe
 let onPick = null;
 let activeStreet = null;
 let totalStreetCount = 0;
+let streetNeighborhoodMap = null; // { [normKey]: nbKey } — for prioritizing in-nb suggestions
 
 const _MN_SHORT = [
   "Jan",
@@ -33,11 +35,18 @@ const _MN_SHORT = [
   "Dec",
 ];
 
-export function mountLookup({ streets, catalog, months, onStreetSelected }) {
+export function mountLookup({
+  streets,
+  catalog,
+  months,
+  onStreetSelected,
+  streetNeighborhood,
+}) {
   allStreets = streets;
   catalogByKey = new Map(catalog.map((c) => [c.key, c]));
   metaMonths = months || [];
   onPick = onStreetSelected;
+  streetNeighborhoodMap = streetNeighborhood || null;
 
   streetIndex = Object.entries(streets)
     .filter(([norm]) => !isJunkStreet(norm))
@@ -98,9 +107,16 @@ function setupSearch() {
       return;
     }
     const qNorm = normalizeStreet(q) || "";
-    const matches = streetIndex
-      .filter((s) => s.norm.includes(qNorm))
-      .slice(0, 12);
+    const nb = getNeighborhood();
+    let filtered = streetIndex.filter((s) => s.norm.includes(qNorm));
+    // When a neighborhood is active, sort in-neighborhood streets first.
+    if (nb && streetNeighborhoodMap) {
+      filtered = [
+        ...filtered.filter((s) => streetNeighborhoodMap[s.norm] === nb),
+        ...filtered.filter((s) => streetNeighborhoodMap[s.norm] !== nb),
+      ];
+    }
+    const matches = filtered.slice(0, 12);
     if (!matches.length) {
       close();
       return;

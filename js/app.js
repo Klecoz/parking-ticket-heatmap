@@ -16,7 +16,11 @@ import {
   subscribe,
 } from "./state.js";
 import { mountTimeView } from "./time.js";
-import { getTotalCount, initTimeIndex } from "./timeIndex.js";
+import {
+  configureTimeIndex,
+  getTotalCount,
+  initTimeIndex,
+} from "./timeIndex.js";
 import { mountTimelapse } from "./timelapse.js";
 import { fmt } from "./util.js";
 
@@ -56,10 +60,11 @@ import { fmt } from "./util.js";
   );
   neighborhoods = neighborhoodsData?.neighborhoods ?? neighborhoodsData ?? [];
   const streetNeighborhoodMap = neighborhoodsData?.streetNeighborhood ?? {};
-  void streetNeighborhoodMap; // used in commit 3 wiring
 
   // Must be called before any component reads from timeIndex.
   initTimeIndex({ streetsTime, streets });
+  // Pass street→neighborhood map so timeIndex can gate counts to active neighborhood.
+  configureTimeIndex({ streetNeighborhood: streetNeighborhoodMap });
 
   paintHeader(meta);
   paintHeroStats(meta);
@@ -81,13 +86,18 @@ import { fmt } from "./util.js";
 
   mountChips({ catalog });
   mountRange({ months: meta.months || [] });
-  mountMap({ streetsFc, onStreetSelected });
+  mountMap({
+    streetsFc,
+    onStreetSelected,
+    streetNeighborhood: streetNeighborhoodMap,
+  });
   mountTimeView({ time, catalog, months: meta.months || [] });
   mountLookup({
     streets,
     catalog,
     months: meta.months || [],
     onStreetSelected,
+    streetNeighborhood: streetNeighborhoodMap,
   });
   mountLeaderboard({
     streets,

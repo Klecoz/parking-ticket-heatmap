@@ -1417,6 +1417,68 @@ h3 {
   background: var(--muted);
 }
 
+/* Neighborhood active row */
+.lb-nb-active {
+  background: var(--accent-light);
+  border-radius: var(--radius-sm);
+}
+.lb-nb-active .lb-nb-name {
+  color: var(--accent-deep);
+  font-weight: 700;
+}
+.lb-nb-row:hover {
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+}
+.lb-nb-active:hover {
+  background: var(--accent-light);
+}
+
+/* Neighborhood drill-down breadcrumb */
+.nb-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem 0.75rem;
+  margin-bottom: 0.5rem;
+  background: var(--accent-light);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  color: var(--accent-deep);
+}
+.nb-breadcrumb[hidden] {
+  display: none;
+}
+.nb-breadcrumb-label {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.nb-breadcrumb-clear {
+  appearance: none;
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--accent-deep);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.12s,
+    color 0.12s;
+  flex-shrink: 0;
+}
+.nb-breadcrumb-clear:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
 /* ============================ ABOUT ============================ */
 
 #about-app {

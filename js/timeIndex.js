@@ -10,9 +10,10 @@
 //   getStreetSlice(norm, state)               — { total, byViolation, topViolations } scoped to range.
 //   getMonthTotals(state)                     — { total } across active scope (for hero stat).
 
-let streetsTime = null;     // { months, violations, byStreet }
-let streets = null;         // { [norm]: { count, byViolation, topViolations, ... } }
+let streetsTime = null; // { months, violations, byStreet }
+let streets = null; // { [norm]: { count, byViolation, topViolations, ... } }
 let violationIdxByKey = null;
+let streetNeighborhoodMap = null; // { [normKey]: nbKey } — set via configureTimeIndex
 
 let cacheKey = null;
 let cachedCounts = null;
@@ -26,6 +27,11 @@ export function initTimeIndex({ streetsTime: st, streets: s }) {
   invalidate();
 }
 
+export function configureTimeIndex({ streetNeighborhood }) {
+  streetNeighborhoodMap = streetNeighborhood || null;
+  invalidate();
+}
+
 export function invalidate() {
   cacheKey = null;
   cachedCounts = null;
@@ -35,7 +41,14 @@ export function invalidate() {
 
 function keyFor(state) {
   const r = state.range;
-  return `${state.filter}|${r ? `${r.fromIdx}-${r.toIdx}` : 'all'}`;
+  const nb = state.neighborhood || "";
+  return `${state.filter}|${r ? `${r.fromIdx}-${r.toIdx}` : "all"}|${nb}`;
+}
+
+function inNeighborhood(norm, nb) {
+  if (!nb) return true;
+  if (!streetNeighborhoodMap) return true;
+  return streetNeighborhoodMap[norm] === nb;
 }
 
 function ensureCache(state) {
@@ -48,12 +61,14 @@ function ensureCache(state) {
 
   const filter = state.filter;
   const range = state.range;
+  const nb = state.neighborhood || null;
 
   // Fast path: no range → use precomputed all-time aggregates from streets.json.
   if (!range) {
     for (const norm in streets) {
+      if (!inNeighborhood(norm, nb)) continue;
       const s = streets[norm];
-      const c = filter === '_all' ? s.count : (s.byViolation?.[filter] || 0);
+      const c = filter === "_all" ? s.count : s.byViolation?.[filter] || 0;
       if (c > 0) {
         cachedCounts.set(norm, c);
         cachedTotal += c;
@@ -64,11 +79,13 @@ function ensureCache(state) {
   }
 
   // Range path: sum from streets-time.
-  const vIdx = filter === '_all' ? -1 : violationIdxByKey.get(filter);
-  if (filter !== '_all' && vIdx == null) return; // unknown filter key
-  const from = range.fromIdx, to = range.toIdx;
+  const vIdx = filter === "_all" ? -1 : violationIdxByKey.get(filter);
+  if (filter !== "_all" && vIdx == null) return; // unknown filter key
+  const from = range.fromIdx,
+    to = range.toIdx;
 
   for (const norm in streetsTime.byStreet) {
+    if (!inNeighborhood(norm, nb)) continue;
     const entries = streetsTime.byStreet[norm];
     let sum = 0;
     for (const [mIdx, vec] of entries) {
@@ -121,10 +138,12 @@ export function getStreetSlice(norm, state) {
     };
   }
   const entries = streetsTime.byStreet[norm] || [];
-  const from = state.range.fromIdx, to = state.range.toIdx;
+  const from = state.range.fromIdx,
+    to = state.range.toIdx;
   const byViolation = {};
   let total = 0;
-  for (let i = 0; i < streetsTime.violations.length; i++) byViolation[streetsTime.violations[i]] = 0;
+  for (let i = 0; i < streetsTime.violations.length; i++)
+    byViolation[streetsTime.violations[i]] = 0;
   for (const [mIdx, vec] of entries) {
     if (mIdx < from || mIdx > to) continue;
     for (let i = 0; i < vec.length; i++) {

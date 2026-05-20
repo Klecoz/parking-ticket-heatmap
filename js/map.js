@@ -1,7 +1,7 @@
 // Renders Buffalo street centerlines as a Leaflet GeoJSON layer.
 // Per-feature stroke color reflects the active violation filter + date range.
 
-import { getState, subscribe } from "./state.js";
+import { getNeighborhood, getState, subscribe } from "./state.js";
 import { getMaxCount, getStreetCount } from "./timeIndex.js";
 import { fmt, rampColor, rampValue } from "./util.js";
 
@@ -11,9 +11,12 @@ const DEFAULT_ZOOM = 12;
 let map,
   layer,
   onPickStreet = null;
+let streetNeighborhoodMap = null; // { [normKey]: nbKey }
+let neighborhoodPolygons = null; // Map<nbKey, L.LatLngBounds> built lazily from neighborhoods.geojson
 
-export function mountMap({ streetsFc, onStreetSelected }) {
+export function mountMap({ streetsFc, onStreetSelected, streetNeighborhood }) {
   onPickStreet = onStreetSelected;
+  streetNeighborhoodMap = streetNeighborhood || null;
 
   map = L.map("map", {
     preferCanvas: true,
@@ -36,7 +39,15 @@ export function mountMap({ streetsFc, onStreetSelected }) {
     onEachFeature: (f, lyr) => bindFeature(f, lyr),
   }).addTo(map);
 
-  subscribe(() => layer.setStyle((f) => styleFor(f)));
+  let prevNb = null;
+  subscribe(() => {
+    layer.setStyle((f) => styleFor(f));
+    const nb = getNeighborhood();
+    if (nb !== prevNb) {
+      prevNb = nb;
+      if (nb) fitToNeighborhood(nb);
+    }
+  });
 
   // Fit to Buffalo bbox once data is on.
   try {
@@ -47,9 +58,48 @@ export function mountMap({ streetsFc, onStreetSelected }) {
   }
 }
 
+export function setNeighborhoodPolygons(fc) {
+  if (!fc?.features) return;
+  neighborhoodPolygons = new Map();
+  for (const f of fc.features) {
+    const key = f.properties?.key;
+    if (!key) continue;
+    try {
+      const lyr = L.geoJSON(f);
+      const b = lyr.getBounds();
+      if (b.isValid()) neighborhoodPolygons.set(key, b);
+    } catch (_) {
+      /* ignore */
+    }
+  }
+}
+
+function fitToNeighborhood(nbKey) {
+  if (!map || !neighborhoodPolygons) return;
+  const bounds = neighborhoodPolygons.get(nbKey);
+  if (bounds?.isValid()) {
+    map.fitBounds(bounds.pad(0.08), { animate: true, maxZoom: 15 });
+  }
+}
+
 function styleFor(feature) {
   const state = getState();
   const norm = feature.properties?.name;
+  const nb = state.neighborhood;
+
+  // When a neighborhood is active, dim streets outside it.
+  const outOfNeighborhood =
+    nb && streetNeighborhoodMap && streetNeighborhoodMap[norm] !== nb;
+  if (outOfNeighborhood) {
+    return {
+      color: "rgba(180, 175, 168, 0.18)",
+      weight: 0.8,
+      opacity: 0.3,
+      lineCap: "round",
+      lineJoin: "round",
+    };
+  }
+
   const v = getStreetCount(norm, state);
   const max = getMaxCount(state);
   const t = rampValue(v, max);
