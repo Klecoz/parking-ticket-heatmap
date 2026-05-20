@@ -1,6 +1,6 @@
 # Feature Audit — Buffalo Parking Ticket Heatmap
 
-Generated: 2026-05-19
+Generated: 2026-05-19 · Implementation status updated: 2026-05-20
 
 ---
 
@@ -56,16 +56,16 @@ The underlying dataset is 320,983 Buffalo parking summonses from 2024-01-01 onwa
 
 ---
 
-## Implementation order
+## Implementation status
 
-If implementation begins, address in this sequence:
+All nine items from the original implementation order are resolved as of 2026-05-20.
 
-1. **Drop snow event overlay** — zero-risk removal; the feature is already inert and its code can be deleted without affecting any other feature.
-2. **Fix duel hour ministrip** — replace citywide-shaped hour strip with per-street violation-type breakdown from streets.json. Corrects a silent data integrity issue visible to any user who uses the duel feature.
-3. **Reframe risk calculator output** — swap absolute probability + verdict badge for a relative rank/percentile display. Requires only UI changes in risk.js; the underlying formula can stay.
-4. **Remove top range slider** — simplifies the UI and eliminates a redundant interaction surface. Requires deleting rangeSlider.js import from app.js and removing its DOM section.
-5. **Pre-compute neighborhood totals at build time** — enables the neighborhoods overlay to deliver actual analytical value and unlocks the per-neighborhood leaderboard tab.
-6. **Per-neighborhood leaderboard tab** — depends on #5; add a tab to leaderboard.js.
-7. **Violation type × time-of-day detail** — no data changes needed; UI-only enhancement to time.js using already-loaded `hourByDayByViolation`.
-8. **Venue overlay relabeling** — low-effort; retitle toggle, update tooltip text to remove implied correlation.
-9. **Neighborhoods overlay demotion** — conditional on #5; if neighborhood totals are not computed, remove the toggle and bake boundaries into the base map as a permanent non-interactive layer.
+1. ✅ **Drop snow event overlay** — removed; no `snow` references remain in `js/`, `index.html`, or `css/style.css`.
+2. ✅ **Fix duel hour ministrip** — replaced with a per-street violation-type stacked bar (`buildViolationBar` in `js/duel.js`) backed by `streets.json` `byViolation`.
+3. ✅ **Reframe risk calculator output** — `js/risk.js` now renders "Ranks #N of M (top P%)" with no probability or verdict badge.
+4. ✅ **Remove top range slider** — `js/rangeSlider.js` deleted; sparkline brush + chip popover remain as the two entry points.
+5. ✅ **Pre-compute neighborhood totals at build time** — `buildNeighborhoodsData` (point-in-polygon over street centroids) in `scripts/build-data.mjs` emits `data/neighborhoods.json`.
+6. ✅ **Per-neighborhood leaderboard tab** — `js/leaderboard.js` has a `streets` / `neighborhoods` tab toggle driven by `neighborhoods.json`.
+7. ✅ **Violation type × time-of-day detail** — `js/time.js` `byType` view has a DOW chip selector (`bytypeDowSelector`) that slices `hourByDayByViolation` by day-of-week.
+8. ✅ **Venue overlay relabeling** — toggle label is "Stadiums" (`index.html`); marker tooltip in `js/layers.js` reads "Location only — no game-day ticket data available."
+9. n/a **Neighborhoods overlay demotion** — moot once #5 landed; the overlay now carries real per-neighborhood totals.
