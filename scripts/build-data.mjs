@@ -493,6 +493,8 @@ function buildNeighborhoodsData(streetsGeoJSON, streetIndex, catalog) {
   }));
 
   const violationKeys = catalog.map(c => c.key);
+  // streetNeighborhood: { [normStreetKey]: neighborhoodKey } — first match wins.
+  const streetNeighborhood = {};
 
   for (const seg of streetsGeoJSON.features) {
     const { count, byViolation, name: streetName, display } = seg.properties;
@@ -509,6 +511,11 @@ function buildNeighborhoodsData(streetsGeoJSON, streetIndex, catalog) {
         for (const vk of violationKeys) {
           if (byViolation[vk]) nbr.byViolation[vk] = (nbr.byViolation[vk] || 0) + byViolation[vk];
         }
+      }
+      // Record street → neighborhood mapping (first match, since we break).
+      const normKey = streetName; // seg.properties.name is the normalized street key
+      if (normKey && !(normKey in streetNeighborhood)) {
+        streetNeighborhood[normKey] = nbr.key;
       }
       break; // each segment matches at most one neighborhood
     }
@@ -549,9 +556,10 @@ function buildNeighborhoodsData(streetsGeoJSON, streetIndex, catalog) {
   };
 
   const neighborhoodsJsonPath = resolve(OUT_DIR, 'neighborhoods.json');
-  writeFileSync(neighborhoodsJsonPath, JSON.stringify(result));
+  // Output shape: { neighborhoods: [...], streetNeighborhood: { [normKey]: nbKey } }
+  writeFileSync(neighborhoodsJsonPath, JSON.stringify({ neighborhoods: result, streetNeighborhood }));
   writeFileSync(neighborhoodsGeoPath, JSON.stringify(augmentedFc));
-  console.log(`[neighborhoods] wrote ${result.length} neighborhoods → neighborhoods.json`);
+  console.log(`[neighborhoods] wrote ${result.length} neighborhoods + ${Object.keys(streetNeighborhood).length} street mappings → neighborhoods.json`);
   console.log('[neighborhoods] updated neighborhoods.geojson with ticketCount');
 }
 

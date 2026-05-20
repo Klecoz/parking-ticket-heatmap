@@ -50,7 +50,12 @@ import { fmt } from "./util.js";
     return;
   }
   // Load neighborhoods non-blocking — leaderboard degrades gracefully without it.
-  neighborhoods = await fetchJson("data/neighborhoods.json").catch(() => []);
+  // Shape: { neighborhoods: [...], streetNeighborhood: { [normKey]: nbKey } }
+  const neighborhoodsData = await fetchJson("data/neighborhoods.json").catch(
+    () => null,
+  );
+  neighborhoods = neighborhoodsData?.neighborhoods ?? neighborhoodsData ?? [];
+  const streetNeighborhood = neighborhoodsData?.streetNeighborhood ?? {};
 
   // Must be called before any component reads from timeIndex.
   initTimeIndex({ streetsTime, streets });
