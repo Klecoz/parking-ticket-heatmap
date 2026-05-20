@@ -160,6 +160,7 @@ function renderStreets() {
   const max = top[0]?.count || 1;
 
   const list = document.getElementById("leaderboardList");
+  list.removeAttribute("aria-busy");
   list.innerHTML = "";
   for (let i = 0; i < top.length; i++) {
     const s = top[i];
